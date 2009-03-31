@@ -7880,7 +7880,10 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 				return -2;
 			}
 			
-			if (m_submittedAttachments.isEmpty()) M_log.warn(this + " getReviewScore No attachments submitted.");
+			if (m_submittedAttachments.isEmpty()) {
+				M_log.debug(this + " getReviewScore No attachments submitted.");
+				return -2;
+			}
 			else
 			{
 				//we may have already retrived this one
@@ -7935,8 +7938,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 				}
 					
 			}
-			//No assignment available
-			return -2;
+	
 			
 		}
 		
