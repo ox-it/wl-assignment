@@ -6478,6 +6478,25 @@ public class AssignmentAction extends PagedResourceActionII
 
 		if (state.getAttribute(STATE_MESSAGE) == null)
 		{
+		    // Single attachments if using Turnitin:
+		    String assignmentRef = (String) state.getAttribute(VIEW_SUBMISSION_ASSIGNMENT_REFERENCE);
+		    try
+            {
+                Assignment assignment = AssignmentService.getAssignment(assignmentRef);
+                if (assignment.getContent().getAllowReviewService())
+                {
+                    state.setAttribute(FilePickerHelper.FILE_PICKER_MAX_ATTACHMENTS, FilePickerHelper.CARDINALITY_SINGLE);
+                }
+            }
+            catch ( IdUnusedException e )
+            {
+                addAlert(state, rb.getString("cannot_find_assignment"));
+            }
+            catch ( PermissionException e )
+            {
+                addAlert(state, rb.getString("youarenot16"));
+            }
+
 			// get into helper mode with this helper tool
 			startHelper(data.getRequest(), "sakai.filepicker");
 
