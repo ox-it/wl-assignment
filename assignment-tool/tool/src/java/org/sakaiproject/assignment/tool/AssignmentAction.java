@@ -6486,6 +6486,7 @@ public class AssignmentAction extends PagedResourceActionII
                 if (assignment.getContent().getAllowReviewService())
                 {
                     state.setAttribute(FilePickerHelper.FILE_PICKER_MAX_ATTACHMENTS, FilePickerHelper.CARDINALITY_SINGLE);
+                    state.setAttribute(FilePickerHelper.FILE_PICKER_SHOW_URL, Boolean.FALSE);
                 }
             }
             catch ( IdUnusedException e )
