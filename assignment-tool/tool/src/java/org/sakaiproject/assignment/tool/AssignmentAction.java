@@ -7041,6 +7041,9 @@ public class AssignmentAction extends PagedResourceActionII
 		// remove the resubmit number
 		state.removeAttribute(AssignmentSubmission.ALLOW_RESUBMIT_NUMBER);
 
+		// remove content-review setting
+		state.removeAttribute(NEW_ASSIGNMENT_USE_REVIEW_SERVICE);
+
 	} // resetNewAssignment
 
 	/**
