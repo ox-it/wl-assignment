@@ -321,6 +321,35 @@
 				#end
 			</select>
 		</p>
+		#if ($allowReviewService)
+			<p class="instruction labelindnt">
+				$tlang.getString("gen.cr.submit")
+			</p>
+			<p class="shorttext">
+				$!tlang.getString('review.title')
+			</p>
+				<p class="checkbox labelindnt">
+					#if ($!value_UseReviewService.equals("true"))
+						<input id="$name_UseReviewService" name="$name_UseReviewService" type="checkbox" value="true" checked="checked" onclick="javascript:limitSubType(this)"/>
+					#else
+						<input id="$name_UseReviewService" name="$name_UseReviewService" type="checkbox" value="true" onclick="javascript:limitSubType(this)" />
+					#end
+					<label for="$name_UseReviewService">
+						$tlang.getString("review.use")
+					</label>
+				</p>
+				<p class="checkbox labelindnt">
+					#if ($!value_AllowStudentView.equals("true"))
+						<input id="$name_AllowStudentView" name="$name_AllowStudentView" type="checkbox" value="true" checked="checked" />
+					#else
+						<input id="$name_AllowStudentView" name="$name_AllowStudentView" type="checkbox" value="true" />
+					#end
+					<label for="$name_AllowStudentView">
+						$tlang.getString("review.allow") 
+					</label>
+				</p>
+			</p>
+		#end
 #* comment out this option for 2.4 - will default to "0"
 		<p class="shorttext">
 			<label for="allowResubmitNumber">
@@ -409,33 +438,6 @@
 					$tlang.getString("gen.addhonple")
 				</label>
 			</p>
-			#if ($allowReviewService)
-				<p style="display:block">
-				<h4>
-				$!tlang.getString('review.title')
-				</h4>
-					<div class="checkbox  indnt2">
-						#if ($!value_UseReviewService.equals("true"))
-							<input id="$name_UseReviewService" name="$name_UseReviewService" type="checkbox" value="true" checked="checked" onclick="javascript:limitSubType(this)"/>
-						#else
-							<input id="$name_UseReviewService" name="$name_UseReviewService" type="checkbox" value="true" onclick="javascript:limitSubType(this)" />
-						#end
-						<label for="$name_UseReviewService">
-							$tlang.getString("review.use") 
-						</label>
-					</div>
-					<div class="checkbox  indnt2">
-						#if ($!value_AllowStudentView.equals("true"))
-							<input id="$name_AllowStudentView" name="$name_AllowStudentView" type="checkbox" value="true" checked="checked" />
-						#else
-							<input id="$name_AllowStudentView" name="$name_AllowStudentView" type="checkbox" value="true" />
-						#end
-						<label for="$name_AllowStudentView">
-							$tlang.getString("review.allow") 
-						</label>
-					</div>
-				</p>
-			#end
 			#if ($!withGrade && $!withGradebook)
 				## show the "Add to Gradebook" choices or not
 				#if(!$!allowGroupAssignmentsInGradebook)
