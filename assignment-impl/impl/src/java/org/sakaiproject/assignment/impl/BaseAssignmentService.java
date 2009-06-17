@@ -148,8 +148,10 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 	}
 	
 	private AssignmentPeerAssessmentService assignmentPeerAssessmentService = null;
-	public void setAssignmentPeerAssessmentService(AssignmentPeerAssessmentService assignmentPeerAssessmentService){
+	public void setAssignmentPeerAssessmentService(AssignmentPeerAssessmentService assignmentPeerAssessmentService) {
 		this.assignmentPeerAssessmentService = assignmentPeerAssessmentService;
+	}
+
 	}
 
 	private SecurityService securityService = null;
@@ -2732,12 +2734,12 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 		String context = s.getContext();
 		
 		String siteTitle = "";
-		String siteId = "";
+		String siteUrl = "";
 		try
 		{
 			Site site = SiteService.getSite(context);
 			siteTitle = site.getTitle();
-			siteId = site.getId();
+			siteUrl = site.getUrl();
 		}
 		catch (Exception ee)
 		{
@@ -2747,7 +2749,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 		StringBuilder buffer = new StringBuilder();
 		// site title and id
 		buffer.append(rb.getString("noti.site.title") + " " + siteTitle + newline);
-		buffer.append(rb.getString("noti.site.id") + " " + siteId +newline + newline);
+		buffer.append(rb.getString("noti.site.url") + " <a href=\""+ siteUrl+ "\">" + siteUrl + "</a>"+ newline);
 		// assignment title and due date
 		buffer.append(rb.getString("assignment.title") + " " + a.getTitle()+newline);
 		buffer.append(rb.getString("noti.assignment.duedate") + " " + a.getDueTime().toStringLocalFull()+newline + newline);
