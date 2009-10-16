@@ -344,6 +344,11 @@ $(document).ready(function() {
 				#end
 			</select>
 		</p>
+		#if ($allowReviewService)
+			<p class="instruction labelindnt">
+				$tlang.getString("gen.cr.submit")
+			</p>
+		#end
 		##show it only for those assignments not of type non-electronic submission
 		#if($!value_allowResubmitNumber && $value_SubmissionType != 4)
 			#set($resubmitStyle="display:block")
@@ -476,9 +481,9 @@ $(document).ready(function() {
 				</h4>
 				<div class="checkbox  indnt2">
 					#if ($!value_UseReviewService.equals("true"))
-						<input id="$name_UseReviewService" name="$name_UseReviewService" type="checkbox" value="true" checked="checked" />
+							<input id="$name_UseReviewService" name="$name_UseReviewService" type="checkbox" value="true" checked="checked" />
 					#else
-						<input id="$name_UseReviewService" name="$name_UseReviewService" type="checkbox" value="true" />
+							<input id="$name_UseReviewService" name="$name_UseReviewService" type="checkbox" value="true" />
 					#end
 					<label for="$name_UseReviewService">
 						$reviewServiceUse
