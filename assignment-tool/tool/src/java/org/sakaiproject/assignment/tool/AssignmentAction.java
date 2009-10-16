@@ -6053,6 +6053,13 @@ public class AssignmentAction extends PagedResourceActionII
 		else b = Boolean.TRUE.toString();
 		state.setAttribute(NEW_ASSIGNMENT_USE_REVIEW_SERVICE, b);
 		
+		if (Boolean.TRUE.toString().equals(b)
+				&& ((Integer) state.getAttribute(NEW_ASSIGNMENT_SUBMISSION_TYPE)).intValue()
+					!= Assignment.SINGLE_ATTACHMENT_SUBMISSION)
+		{
+			addAlert(state, rb.getString("gen.cr.submit"));
+		}
+
 		//set whether students can view the review service results
 		r = params.getString(NEW_ASSIGNMENT_ALLOW_STUDENT_VIEW);
 		if (r == null) b = Boolean.FALSE.toString();
@@ -9939,6 +9946,10 @@ public class AssignmentAction extends PagedResourceActionII
 			saveSubmitInputs(state, params);
 			
 			// Restrict file picker configuration if using content-review (Turnitin):
+			{
+				state.setAttribute(VIEW_SUBMISSION_HONOR_PLEDGE_YES, "true");
+			}
+			// Single attachments if using Turnitin:
 			String assignmentRef = (String) state.getAttribute(VIEW_SUBMISSION_ASSIGNMENT_REFERENCE);
 			try
 			{

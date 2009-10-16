@@ -12070,7 +12070,15 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 				Assignment ass = this.getAssignment();
 				if (ass != null && cr != null)
 				{
-					contentReviewService.queueContent(null, null, ass.getReference(), cr.getId());
+					if (cr != null)
+					{
+						contentReviewService.queueContent(null, null, ass.getReference(), cr.getId());
+					}
+					else
+					{
+						// TODO We really need to handle this as the user should be aware that nothing can be sent to TII
+						M_log.warn(this + " BaseAssignmentSubmission postAttachment: No suitable attachments found for submission: "+ this.m_id);
+					}
 				}
 				else
 				{
@@ -12080,7 +12088,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			} catch (QueueException qe) {
 				M_log.warn(" BaseAssignmentSubmissionEdit postAttachment: Unable to add content to Content Review queue: " + qe.getMessage());
 			} catch (Exception e) {
-				e.printStackTrace();
+				M_log.warn(this + " BaseAssignmentSubmission postAttachment: Failed to post.", e);
 			}
 
 		}

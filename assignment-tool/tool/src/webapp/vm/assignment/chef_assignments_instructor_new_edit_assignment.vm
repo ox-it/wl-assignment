@@ -447,6 +447,11 @@ $(document).ready(function() {
 				#end
 			</select>
 		</p>
+		#if ($allowReviewService)
+			<p class="instruction labelindnt">
+				$tlang.getString("gen.cr.submit")
+			</p>
+		#end
 		##show it only for those assignments not of type non-electronic submission
 		#if($!value_allowResubmitNumber && $value_SubmissionType != 4)
 			#set($resubmitStyle="display:block")
