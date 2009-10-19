@@ -7356,6 +7356,24 @@ public class AssignmentAction extends PagedResourceActionII
 			{
 				state.setAttribute(VIEW_SUBMISSION_HONOR_PLEDGE_YES, "true");
 			}
+			// Single attachments if using Turnitin:
+			String assignmentRef = (String) state.getAttribute(VIEW_SUBMISSION_ASSIGNMENT_REFERENCE);
+			try
+			{
+				Assignment assignment = AssignmentService.getAssignment(assignmentRef);
+				if (assignment.getContent().getAllowReviewService())
+				{
+					state.setAttribute(FilePickerHelper.FILE_PICKER_MAX_ATTACHMENTS, FilePickerHelper.CARDINALITY_SINGLE);
+				}
+			}
+			catch ( IdUnusedException e )
+			{
+				addAlert(state, rb.getString("cannot_find_assignment"));
+			}
+			catch ( PermissionException e )
+			{
+				addAlert(state, rb.getString("youarenot16"));
+			}
 			// TODO: file picker to save in dropbox? -ggolden
 			// User[] users = { UserDirectoryService.getCurrentUser() };
 			// state.setAttribute(ResourcesAction.STATE_SAVE_ATTACHMENT_IN_DROPBOX, users);
