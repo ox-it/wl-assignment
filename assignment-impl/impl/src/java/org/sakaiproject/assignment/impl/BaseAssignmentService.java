@@ -870,7 +870,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 
 				retVal = addAssignment(context);
 				retVal.setContentReference(newContent.getReference());
-				retVal.setTitle(existingAssignment.getTitle() + " - Copy");
+				retVal.setTitle(existingAssignment.getTitle() + " - " + rb.getString("assignment.copy"));
 				retVal.setSection(existingAssignment.getSection());
 				retVal.setOpenTime(existingAssignment.getOpenTime());
 				retVal.setDueTime(existingAssignment.getDueTime());
@@ -1422,7 +1422,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 
 				existingContent = getAssignmentContent(contentReference);
 				retVal = addAssignmentContent(context);
-				retVal.setTitle(existingContent.getTitle() + " - Copy");
+				retVal.setTitle(existingContent.getTitle() + " - " + rb.getString("assignment.copy"));
 				retVal.setInstructions(existingContent.getInstructions());
 				retVal.setHonorPledge(existingContent.getHonorPledge());
 				retVal.setTypeOfSubmission(existingContent.getTypeOfSubmission());
@@ -3563,7 +3563,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 							// find right row
 							row = sheet.getRow(((Integer)user_row.get(userId)).intValue());
 						
-							if (submission.getGraded() && submission.getGradeReleased() && submission.getGrade() != null)
+							if (submission.getGraded() && submission.getGrade() != null)
 							{
 								// graded and released
 								if (assignmentType == 3)
@@ -3602,11 +3602,11 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 									cell.setCellValue(submission.getGrade());
 								}
 							}
-							else
+							else if (submission.getSubmitted() && submission.getTimeSubmitted() != null)
 							{
-								// no grade available yet
+								// submitted, but no grade available yet
 								cell = row.getCell(cellNum);
-								cell.setCellValue("");
+								cell.setCellValue(rb.getString("gen.nograd"));
 							}
 						} // if
 					}
@@ -3778,6 +3778,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			// Create the ZIP file
 			String submittersName = "";
 			int count = 1;
+			String caughtException = null;
 			while (submissions.hasNext())
 			{
 				AssignmentSubmission s = (AssignmentSubmission) submissions.next();
@@ -3819,101 +3820,91 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 								submittersName = submittersName.concat(StringUtil.trimToNull(submittersString));
 								submittedText = s.getSubmittedText();
 		
-								boolean added = false;
-								while (!added)
+								submittersName = submittersName.concat("/");
+								// create the folder structure - named after the submitter's name
+								if (typeOfSubmission != Assignment.ATTACHMENT_ONLY_ASSIGNMENT_SUBMISSION)
 								{
-									try
-									{
-										submittersName = submittersName.concat("/");
-										// create the folder structure - named after the submitter's name
-										if (typeOfSubmission != Assignment.ATTACHMENT_ONLY_ASSIGNMENT_SUBMISSION)
-										{
-											// create the text file only when a text submission is allowed
-											ZipEntry textEntry = new ZipEntry(submittersName + submittersString + "_submissionText" + ZIP_SUBMITTED_TEXT_FILE_TYPE);
-											out.putNextEntry(textEntry);
-											byte[] text = submittedText.getBytes();
-											out.write(text);
-											textEntry.setSize(text.length);
-											out.closeEntry();
-										}
-										
-										// record submission timestamp
-										if (s.getSubmitted() && s.getTimeSubmitted() != null)
-										{
-											ZipEntry textEntry = new ZipEntry(submittersName + "timestamp.txt");
-											out.putNextEntry(textEntry);
-											byte[] b = (s.getTimeSubmitted().toString()).getBytes();
-											out.write(b);
-											textEntry.setSize(b.length);
-											out.closeEntry();
-										}
-										// create a feedbackText file into zip
-										ZipEntry fTextEntry = new ZipEntry(submittersName + "feedbackText.html");
-										out.putNextEntry(fTextEntry);
-										byte[] fText = s.getFeedbackText().getBytes();
-										out.write(fText);
-										fTextEntry.setSize(fText.length);
-										out.closeEntry();
-										
-										// the comments.txt file to show instructor's comments
-										ZipEntry textEntry = new ZipEntry(submittersName + "comments" + ZIP_COMMENT_FILE_TYPE);
-										out.putNextEntry(textEntry);
-										byte[] b = FormattedText.encodeUnicode(s.getFeedbackComment()).getBytes();
-										out.write(b);
-										textEntry.setSize(b.length);
-										out.closeEntry();
-										
-										// create an attachment folder for the feedback attachments
-										String feedbackSubAttachmentFolder = submittersName + rb.getString("download.feedback.attachment") + "/";
-										ZipEntry feedbackSubAttachmentFolderEntry = new ZipEntry(feedbackSubAttachmentFolder);
-										out.putNextEntry(feedbackSubAttachmentFolderEntry);
-										out.closeEntry();
-		
-										// create a attachment folder for the submission attachments
-										String sSubAttachmentFolder = submittersName + rb.getString("download.submission.attachment") + "/";
-										ZipEntry sSubAttachmentFolderEntry = new ZipEntry(sSubAttachmentFolder);
-										out.putNextEntry(sSubAttachmentFolderEntry);
-										out.closeEntry();
-										// add all submission attachment into the submission attachment folder
-										zipAttachments(out, submittersName, sSubAttachmentFolder, s.getSubmittedAttachments());
-										// add all feedback attachment folder
-										zipAttachments(out, submittersName, feedbackSubAttachmentFolder, s.getFeedbackAttachments());
-		
-										added = true;
-									}
-									catch (IOException e)
-									{
-										exceptionMessage.append("Can not establish the IO to create zip file for user "
-												+ submittersName);
-										M_log.warn(this + " zipSubmissions --IOException unable to create the zip file for user"
-												+ submittersName);
-										submittersName = submittersName.substring(0, submittersName.length() - 1) + "_" + count++;
-									}
-								}	//while
+									// create the text file only when a text submission is allowed
+									ZipEntry textEntry = new ZipEntry(submittersName + submittersString + "_submissionText" + ZIP_SUBMITTED_TEXT_FILE_TYPE);
+									out.putNextEntry(textEntry);
+									byte[] text = submittedText.getBytes();
+									out.write(text);
+									textEntry.setSize(text.length);
+									out.closeEntry();
+								}
+								
+								// record submission timestamp
+								if (s.getSubmitted() && s.getTimeSubmitted() != null)
+								{
+									ZipEntry textEntry = new ZipEntry(submittersName + "timestamp.txt");
+									out.putNextEntry(textEntry);
+									byte[] b = (s.getTimeSubmitted().toString()).getBytes();
+									out.write(b);
+									textEntry.setSize(b.length);
+									out.closeEntry();
+								}
+								// create a feedbackText file into zip
+								ZipEntry fTextEntry = new ZipEntry(submittersName + "feedbackText.html");
+								out.putNextEntry(fTextEntry);
+								byte[] fText = s.getFeedbackText().getBytes();
+								out.write(fText);
+								fTextEntry.setSize(fText.length);
+								out.closeEntry();
+								
+								// the comments.txt file to show instructor's comments
+								ZipEntry textEntry = new ZipEntry(submittersName + "comments" + ZIP_COMMENT_FILE_TYPE);
+								out.putNextEntry(textEntry);
+								byte[] b = FormattedText.encodeUnicode(s.getFeedbackComment()).getBytes();
+								out.write(b);
+								textEntry.setSize(b.length);
+								out.closeEntry();
+								
+								// create an attachment folder for the feedback attachments
+								String feedbackSubAttachmentFolder = submittersName + rb.getString("download.feedback.attachment") + "/";
+								ZipEntry feedbackSubAttachmentFolderEntry = new ZipEntry(feedbackSubAttachmentFolder);
+								out.putNextEntry(feedbackSubAttachmentFolderEntry);
+								out.closeEntry();
+
+								// create a attachment folder for the submission attachments
+								String sSubAttachmentFolder = submittersName + rb.getString("download.submission.attachment") + "/";
+								ZipEntry sSubAttachmentFolderEntry = new ZipEntry(sSubAttachmentFolder);
+								out.putNextEntry(sSubAttachmentFolderEntry);
+								out.closeEntry();
+								// add all submission attachment into the submission attachment folder
+								zipAttachments(out, submittersName, sSubAttachmentFolder, s.getSubmittedAttachments());
+								// add all feedback attachment folder
+								zipAttachments(out, submittersName, feedbackSubAttachmentFolder, s.getFeedbackAttachments());
 							} // if
 						}
 					}
 					catch (Exception e)
 					{
-						M_log.warn(this + " zipSubmissions " + e.getMessage() + " userId = " + userId);
+						caughtException = e.getMessage();
+						break;
 					}
 				} // if the user is still in site
 
 			} // while -- there is submission
 
-			// create a grades.csv file into zip
-			ZipEntry gradesCSVEntry = new ZipEntry(root + "grades.csv");
-			out.putNextEntry(gradesCSVEntry);
-			byte[] grades = gradesBuffer.toString().getBytes();
-			out.write(grades);
-			gradesCSVEntry.setSize(grades.length);
-			out.closeEntry();
+			if (caughtException == null)
+			{
+				// create a grades.csv file into zip
+				ZipEntry gradesCSVEntry = new ZipEntry(root + "grades.csv");
+				out.putNextEntry(gradesCSVEntry);
+				byte[] grades = gradesBuffer.toString().getBytes();
+				out.write(grades);
+				gradesCSVEntry.setSize(grades.length);
+				out.closeEntry();
+			}
+			else
+			{
+				// log the error
+				exceptionMessage.append("Exception " + caughtException + " for creating submission zip file for assignment " + "\"" + assignmentTitle + "\"\n");
+			}
 		}
 		catch (IOException e)
 		{
-			exceptionMessage.append("Can not establish the IO to create zip file. ");
-			M_log.warn(this + " zipSubmissions IOException unable to create the zip file for assignment "
-					+ assignmentTitle);
+			exceptionMessage.append("IOException for creating submission zip file for assignment " + "\"" + assignmentTitle + "\"\n");
 		} finally {
             // Complete the ZIP file
 		    if (out != null) {
@@ -5177,10 +5168,6 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			AssignmentSubmission submission = null;
 			
 			submission = getSubmission(a.getReference(), u);
-			if (submission != null)
-			{
-				closeTime = submission.getCloseTime();
-			}
 			
 			if (submission == null || (submission != null && submission.getTimeSubmitted() == null))
 			{
@@ -5322,7 +5309,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 		 */
 		public BaseAssignment(Element el)
 		{
-			M_log.debug(this + " BASE ASSIGNMENT : ENTERING STORAGE CONSTRUCTOR");
+			M_log.debug(" BASE ASSIGNMENT : ENTERING STORAGE CONSTRUCTOR");
 
 			m_properties = new BaseResourcePropertiesEdit();
 
@@ -5333,16 +5320,16 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 
 			m_id = el.getAttribute("id");
 			
-				M_log.debug(this + " BASE ASSIGNMENT : STORAGE CONSTRUCTOR : ASSIGNMENT ID : " + m_id);
+				M_log.debug(" BASE ASSIGNMENT : STORAGE CONSTRUCTOR : ASSIGNMENT ID : " + m_id);
 			m_title = el.getAttribute("title");
 			m_section = el.getAttribute("section");
 			m_draft = getBool(el.getAttribute("draft"));
 			
-				M_log.debug(this + " BASE ASSIGNMENT : STORAGE CONSTRUCTOR : READ THROUGH REG ATTS");
+				M_log.debug(" BASE ASSIGNMENT : STORAGE CONSTRUCTOR : READ THROUGH REG ATTS");
 
 			m_assignmentContent = el.getAttribute("assignmentcontent");
 			
-				M_log.debug(this + " BASE ASSIGNMENT : STORAGE CONSTRUCTOR : CONTENT ID : "
+				M_log.debug(" BASE ASSIGNMENT : STORAGE CONSTRUCTOR : CONTENT ID : "
 						+ m_assignmentContent);
 
 			m_openTime = getTimeObject(el.getAttribute("opendate"));
@@ -5364,7 +5351,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			m_authors = new Vector();
 			intString = el.getAttribute("numberofauthors");
 			
-				M_log.debug(this + " BASE ASSIGNMENT : STORAGE CONSTRUCTOR : number of authors : " + intString);
+				M_log.debug(" BASE ASSIGNMENT : STORAGE CONSTRUCTOR : number of authors : " + intString);
 			try
 			{
 				numAttributes = Integer.parseInt(intString);
@@ -5372,14 +5359,14 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 				for (int x = 0; x < numAttributes; x++)
 				{
 					
-						M_log.debug(this + " BASE ASSIGNMENT : STORAGE CONSTRUCTOR : reading author # " + x);
+						M_log.debug(" BASE ASSIGNMENT : STORAGE CONSTRUCTOR : reading author # " + x);
 					attributeString = "author" + x;
 					tempString = el.getAttribute(attributeString);
 
 					if (tempString != null)
 					{
 						
-							M_log.debug(this + " BASE ASSIGNMENT : STORAGE CONSTRUCTOR : adding author # " + x
+							M_log.debug(" BASE ASSIGNMENT : STORAGE CONSTRUCTOR : adding author # " + x
 									+ " id :  " + tempString);
 						m_authors.add(tempString);
 					}
@@ -5420,7 +5407,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 				m_access = access;
 			}
 
-			M_log.debug(this + " BASE ASSIGNMENT : LEAVING STORAGE CONSTRUCTOR");
+			M_log.debug(" BASE ASSIGNMENT : LEAVING STORAGE CONSTRUCTOR");
 
 		}// storage constructor
 
@@ -6550,7 +6537,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			String attributeString = null;
 			String tempString = null;
 			Reference tempReference = null;
-			M_log.debug(this + " BaseAssignmentContent : Entering read");
+			M_log.debug(" BaseAssignmentContent : Entering read");
 
 			m_id = el.getAttribute("id");
 			m_context = el.getAttribute("context");
@@ -6573,7 +6560,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			}
 			catch (Exception e)
 			{
-				M_log.warn(this + " BaseAssignmentContent Exception parsing honor pledge int from xml file string : " + e);
+				M_log.warn(" BaseAssignmentContent Exception parsing honor pledge int from xml file string : " + e);
 			}
 
 			try
@@ -6582,7 +6569,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			}
 			catch (Exception e)
 			{
-				M_log.warn(this + " BaseAssignmentContent Exception parsing submission type int from xml file string : " + e);
+				M_log.warn(" BaseAssignmentContent Exception parsing submission type int from xml file string : " + e);
 			}
 
 			try
@@ -6591,7 +6578,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			}
 			catch (Exception e)
 			{
-				M_log.warn(this + " BaseAssignmentContent Exception parsing grade type int from xml file string : " + e);
+				M_log.warn(" BaseAssignmentContent Exception parsing grade type int from xml file string : " + e);
 			}
 
 			try
@@ -6611,7 +6598,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			}
 			catch (Exception e)
 			{
-				M_log.warn(this + " BaseAssignmentContent Exception parsing maxgradepoint int from xml file string : " + e);
+				M_log.warn(" BaseAssignmentContent Exception parsing maxgradepoint int from xml file string : " + e);
 			}
 
 			// READ THE AUTHORS
@@ -6630,14 +6617,14 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			}
 			catch (Exception e)
 			{
-				M_log.warn(this + " BaseAssignmentContent: Exception reading authors : " + e);
+				M_log.warn(" BaseAssignmentContent: Exception reading authors : " + e);
 			}
 
 			// READ THE ATTACHMENTS
 			m_attachments = m_entityManager.newReferenceList();
-			M_log.debug(this + " BaseAssignmentContent: Reading attachments : ");
+			M_log.debug(" BaseAssignmentContent: Reading attachments : ");
 			intString = el.getAttribute("numberofattachments");
-			M_log.debug(this + " BaseAssignmentContent: num attachments : " + intString);
+			M_log.debug(" BaseAssignmentContent: num attachments : " + intString);
 			try
 			{
 				numAttributes = Integer.parseInt(intString);
@@ -6650,13 +6637,13 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 					{
 						tempReference = m_entityManager.newReference(tempString);
 						m_attachments.add(tempReference);
-						M_log.debug(this + " BaseAssignmentContent: " + attributeString + " : " + tempString);
+						M_log.debug(" BaseAssignmentContent: " + attributeString + " : " + tempString);
 					}
 				}
 			}
 			catch (Exception e)
 			{
-				M_log.warn(this + " BaseAssignmentContent: Exception reading attachments : " + e);
+				M_log.warn(" BaseAssignmentContent: Exception reading attachments : " + e);
 			}
 
 			// READ THE PROPERTIES
@@ -6686,7 +6673,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 						if (element.getTagName().equals("instructions-formatted"))
 							m_instructions = FormattedText.convertOldFormattedText(m_instructions);
 						
-							M_log.debug(this + " BaseAssignmentContent(Element): instructions : " + m_instructions);
+							M_log.debug(" BaseAssignmentContent(Element): instructions : " + m_instructions);
 					}
 					if (m_instructions == null)
 					{
@@ -6695,7 +6682,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 				}
 			}
 
-			M_log.debug(this + " BaseAssignmentContent(Element): LEAVING STORAGE CONSTRUTOR");
+			M_log.debug(" BaseAssignmentContent(Element): LEAVING STORAGE CONSTRUTOR");
 
 		}// storage constructor
 		
@@ -7988,7 +7975,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			String tempString = null;
 			Reference tempReference = null;
 
-			M_log.debug(this + " BaseAssigmentSubmission : ENTERING STORAGE CONSTRUCTOR");
+			M_log.debug(" BaseAssigmentSubmission : ENTERING STORAGE CONSTRUCTOR");
 
 			m_id = el.getAttribute("id");
 			m_context = el.getAttribute("context");
@@ -8034,7 +8021,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 
 			// READ THE SUBMITTERS
 			m_submitters = new Vector();
-			M_log.debug(this + " BaseAssignmentSubmission : CONSTRUCTOR : Reading submitters : ");
+			M_log.debug(" BaseAssignmentSubmission : CONSTRUCTOR : Reading submitters : ");
 			intString = el.getAttribute("numberofsubmitters");
 			try
 			{
@@ -8056,7 +8043,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			m_feedbackAttachments = m_entityManager.newReferenceList();
 			intString = el.getAttribute("numberoffeedbackattachments");
 			
-				M_log.debug(this + " BaseAssignmentSubmission: CONSTRUCTOR : num feedback attachments : " + intString);
+				M_log.debug(" BaseAssignmentSubmission: CONSTRUCTOR : num feedback attachments : " + intString);
 			try
 			{
 				numAttributes = Integer.parseInt(intString);
@@ -8070,7 +8057,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 						tempReference = m_entityManager.newReference(tempString);
 						m_feedbackAttachments.add(tempReference);
 						
-							M_log.debug(this + " BaseAssignmentSubmission: CONSTRUCTOR : " + attributeString + " : "
+							M_log.debug(" BaseAssignmentSubmission: CONSTRUCTOR : " + attributeString + " : "
 									+ tempString);
 					}
 				}
@@ -8084,7 +8071,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			m_submittedAttachments = m_entityManager.newReferenceList();
 			intString = el.getAttribute("numberofsubmittedattachments");
 			
-				M_log.debug(this + " BaseAssignmentSubmission: CONSTRUCTOR : num submitted attachments : " + intString);
+				M_log.debug(" BaseAssignmentSubmission: CONSTRUCTOR : num submitted attachments : " + intString);
 			try
 			{
 				numAttributes = Integer.parseInt(intString);
@@ -8098,7 +8085,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 						tempReference = m_entityManager.newReference(tempString);
 						m_submittedAttachments.add(tempReference);
 						
-							M_log.debug(this + " BaseAssignmentSubmission: CONSTRUCTOR : " + attributeString + " : "
+							M_log.debug(" BaseAssignmentSubmission: CONSTRUCTOR : " + attributeString + " : "
 									+ tempString);
 					}
 				}
@@ -8130,7 +8117,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 					{
 						m_submittedText = element.getChildNodes().item(0).getNodeValue();
 						
-							M_log.debug(this + " BaseAssignmentSubmission: CONSTRUCTOR : submittedtext : " + m_submittedText);
+							M_log.debug(" BaseAssignmentSubmission: CONSTRUCTOR : submittedtext : " + m_submittedText);
 					}
 					if (m_submittedText == null)
 					{
@@ -8144,7 +8131,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 					{
 						m_feedbackComment = element.getChildNodes().item(0).getNodeValue();
 						
-							M_log.debug(this + " BaseAssignmentSubmission: CONSTRUCTOR : feedbackcomment : "
+							M_log.debug(" BaseAssignmentSubmission: CONSTRUCTOR : feedbackcomment : "
 									+ m_feedbackComment);
 					}
 					if (m_feedbackComment == null)
@@ -8159,7 +8146,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 					{
 						m_feedbackText = element.getChildNodes().item(0).getNodeValue();
 						
-							M_log.debug(this + " BaseAssignmentSubmission: CONSTRUCTOR : FEEDBACK TEXT : " + m_feedbackText);
+							M_log.debug(" BaseAssignmentSubmission: CONSTRUCTOR : FEEDBACK TEXT : " + m_feedbackText);
 					}
 					if (m_feedbackText == null)
 					{
@@ -8205,7 +8192,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			
 			
 			
-			M_log.debug(this + " BaseAssignmentSubmission: LEAVING STORAGE CONSTRUCTOR");
+			M_log.debug(" BaseAssignmentSubmission: LEAVING STORAGE CONSTRUCTOR");
 
 		}// storage constructor
 		
@@ -8809,6 +8796,21 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 				{
 					return StringUtil.trimToZero(grade);
 				}
+			}
+			else if (m.getContent().getTypeOfGrade() == Assignment.UNGRADED_GRADE_TYPE) {
+				String ret = "";
+				if (grade != null) {
+					if (grade.equalsIgnoreCase("gen.nograd")) ret = rb.getString("gen.nograd");
+				}
+				return ret;
+			}
+			else if (m.getContent().getTypeOfGrade() == Assignment.PASS_FAIL_GRADE_TYPE) {
+				String ret = rb.getString("ungra");
+				if (grade != null) {
+					if (grade.equalsIgnoreCase("Pass")) ret = rb.getString("pass3");
+					else if (grade.equalsIgnoreCase("Fail")) ret = rb.getString("fail");
+				}
+				return ret;
 			}
 			else
 			{
