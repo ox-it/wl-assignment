@@ -7981,7 +7981,7 @@ public class AssignmentAction extends PagedResourceActionII
 		state.setAttribute(ALLPURPOSE_RETRACT_AMPM, "PM");
 
 		state.setAttribute(NEW_ASSIGNMENT_SECTION, "001");
-		state.setAttribute(NEW_ASSIGNMENT_SUBMISSION_TYPE, new Integer(Assignment.TEXT_AND_ATTACHMENT_ASSIGNMENT_SUBMISSION));
+		state.setAttribute(NEW_ASSIGNMENT_SUBMISSION_TYPE, new Integer(Assignment.ATTACHMENT_ONLY_ASSIGNMENT_SUBMISSION));
 		state.setAttribute(NEW_ASSIGNMENT_GRADE_TYPE, new Integer(Assignment.UNGRADED_GRADE_TYPE));
 		state.setAttribute(NEW_ASSIGNMENT_GRADE_POINTS, "");
 		state.setAttribute(NEW_ASSIGNMENT_DESCRIPTION, "");
