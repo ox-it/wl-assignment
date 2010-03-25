@@ -60,26 +60,6 @@ $(document).ready(function() {
 		}
 	}
 	
-	// Selecting Turnitin limits submission types to 'attachments':
-	function limitSubType(caller)
-	{
-		if(caller.checked)
-		{
-			document.getElementById('subType').selectedIndex = 1;
-			document.getElementById('subType').focus();
-		}
-	}
-
-	// Selecting a submission type other than 'attachments' deselects TII:
-	function limitContentReview(dropdown, checkbox)
-	{
-		if(dropdown.selectedIndex != 1 && checkbox.checked)
-		{
-			checkbox.checked = false;
-			checkbox.focus();
-		}
-	}
-
 	#*
 	## This function is deprecated
 		function SetCloseDate(obj_checkbox, obj_1, obj_2, obj_3, obj_4, obj_5, obj_6)
@@ -349,7 +329,7 @@ $(document).ready(function() {
 			<label for="subType">
 				$tlang.getString("gen.stusub")
 			</label>
-			<select name="$name_SubmissionType" id="subType" onchange="limitContentReview(this, $name_UseReviewService);if(document.getElementById('subType').value != 4){document.getElementById('tempAllowRes').style.display = 'block';resizeFrame();}else{document.getElementById('tempAllowRes').style.display = 'none';document.getElementById('allowResToggle').checked=false}document.getElementById('allowResubmitNumber').style.display = 'none';document.getElementById('allowResubmitTime').style.display = 'none';" /> >
+			<select name="$name_SubmissionType" id="subType" onchange="if(document.getElementById('subType').value != 4){document.getElementById('tempAllowRes').style.display = 'block';resizeFrame();}else{document.getElementById('tempAllowRes').style.display = 'none';document.getElementById('allowResToggle').checked=false}document.getElementById('allowResubmitNumber').style.display = 'none';document.getElementById('allowResubmitTime').style.display = 'none';" /> >
 				#foreach ($i in [1..$!value_totalSubmissionTypes])
 					#if ($i == $value_SubmissionType)
 						<option value="$i" selected="selected">$submissionTypeTable.get($i)</option>
@@ -363,31 +343,6 @@ $(document).ready(function() {
 			<p class="instruction labelindnt">
 				$tlang.getString("gen.cr.submit")
 			</p>
-			<div style="display:block">
-				<h4>
-				$!tlang.getString('review.title')
-				</h4>
-				<div class="checkbox  indnt2">
-					#if ($!value_UseReviewService.equals("true"))
-							<input id="$name_UseReviewService" name="$name_UseReviewService" type="checkbox" value="true" checked="checked" onclick="javascript:limitSubType(this)"/>
-					#else
-							<input id="$name_UseReviewService" name="$name_UseReviewService" type="checkbox" value="true" onclick="javascript:limitSubType(this)" />
-					#end
-					<label for="$name_UseReviewService">
-						$tlang.getString("review.use")
-					</label>
-				</div>
-				<div class="checkbox  indnt2">
-					#if ($!value_AllowStudentView.equals("true"))
-						<input id="$name_AllowStudentView" name="$name_AllowStudentView" type="checkbox" value="true" checked="checked" />
-					#else
-						<input id="$name_AllowStudentView" name="$name_AllowStudentView" type="checkbox" value="true" />
-					#end
-					<label for="$name_AllowStudentView">
-						$tlang.getString("review.allow") 
-					</label>
-				</div>
-			</div>
 		#end
 		##show it only for those assignments not of type non-electronic submission
 		#if($!value_allowResubmitNumber && $value_SubmissionType != 4)
@@ -514,6 +469,33 @@ $(document).ready(function() {
 				$tlang.getString("gen.addhonple")
 			</label>
 		</p>
+		#if ($allowReviewService)
+			<div style="display:block">
+				<h4>
+				$!tlang.getString('review.title')
+				</h4>
+				<div class="checkbox  indnt2">
+					#if ($!value_UseReviewService.equals("true"))
+							<input id="$name_UseReviewService" name="$name_UseReviewService" type="checkbox" value="true" checked="checked" />
+					#else
+							<input id="$name_UseReviewService" name="$name_UseReviewService" type="checkbox" value="true" />
+					#end
+					<label for="$name_UseReviewService">
+						$tlang.getString("review.use")
+					</label>
+				</div>
+				<div class="checkbox  indnt2">
+					#if ($!value_AllowStudentView.equals("true"))
+						<input id="$name_AllowStudentView" name="$name_AllowStudentView" type="checkbox" value="true" checked="checked" />
+					#else
+						<input id="$name_AllowStudentView" name="$name_AllowStudentView" type="checkbox" value="true" />
+					#end
+					<label for="$name_AllowStudentView">
+						$tlang.getString("review.allow") 
+					</label>
+				</div>
+			</div>
+		#end
 		#if ($!withGrade && $!withGradebook)
 			## show the "Add to Gradebook" choices or not
 			#if(!$!allowGroupAssignmentsInGradebook)
