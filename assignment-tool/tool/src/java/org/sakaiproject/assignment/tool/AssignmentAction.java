@@ -4217,6 +4217,13 @@ public class AssignmentAction extends PagedResourceActionII
 		else b = Boolean.TRUE.toString();
 		state.setAttribute(NEW_ASSIGNMENT_USE_REVIEW_SERVICE, b);
 		
+		if (Boolean.TRUE.toString().equals(b)
+				&& ((Integer) state.getAttribute(NEW_ASSIGNMENT_SUBMISSION_TYPE)).intValue()
+					!= Assignment.ATTACHMENT_ONLY_ASSIGNMENT_SUBMISSION)
+		{
+			addAlert(state, rb.getString("gen.cr.submit"));
+		}
+
 		//set whether students can view the review service results
 		r = params.getString(NEW_ASSIGNMENT_ALLOW_STUDENT_VIEW);
 		if (r == null) b = Boolean.FALSE.toString();
