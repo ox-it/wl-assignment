@@ -9647,7 +9647,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 					else
 					{
 						// TODO We really need to handle this as the user should be aware that nothing can be sent to TII
-						M_log.warn(this + " BaseAssignmentSubmission postAttachment: No suitable attachments found for: "+ ass.getId());
+						M_log.warn(this + " BaseAssignmentSubmission postAttachment: No suitable attachments found for submission: "+ this.m_id));
 					}
 				}
 				else
