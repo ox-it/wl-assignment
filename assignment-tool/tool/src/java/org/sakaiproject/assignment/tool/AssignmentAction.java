@@ -26,6 +26,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.text.Collator;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -33,6 +35,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.HashSet;
 import java.util.HashMap;
@@ -41,13 +44,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Vector;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
+import org.apache.tools.zip.ZipEntry;
+import org.apache.tools.zip.ZipFile;
 import java.util.GregorianCalendar;
 
 import java.nio.channels.*;
 import java.nio.*;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.sakaiproject.announcement.api.AnnouncementChannel;
@@ -690,10 +694,13 @@ public class AssignmentAction extends PagedResourceActionII
 	private static final String MODELANSWER_TEXT = "modelAnswer.text";
 	private static final String MODELANSWER_SHOWTO = "modelAnswer.showTo";
 	private static final String MODELANSWER_ATTACHMENTS = "modelanswer_attachments";
+	private static final String MODELANSWER_TO_DELETE = "modelanswer.toDelete";
 	/******** Note ***********/
 	private static final String NOTE = "note";
 	private static final String NOTE_TEXT = "note.text";
 	private static final String NOTE_SHAREWITH = "note.shareWith";
+	private static final String NOTE_TO_DELETE = "note.toDelete";
+	
 	/******** AllPurpose *******/
 	private static final String ALLPURPOSE = "allPurpose";
 	private static final String ALLPURPOSE_TITLE = "allPurpose.title";
@@ -717,6 +724,7 @@ public class AssignmentAction extends PagedResourceActionII
 	private static final String ALLPURPOSE_RETRACT_HOUR = "allPurpose.retractHour";
 	private static final String ALLPURPOSE_RETRACT_MIN = "allPurpose.retractMin";
 	private static final String ALLPURPOSE_RETRACT_AMPM = "allPurpose.retractAMPM";
+	private static final String ALLPURPOSE_TO_DELETE = "allPurpose.toDelete";
 	
 	private static final String SHOW_ALLOW_RESUBMISSION = "show_allow_resubmission";
 	
@@ -768,7 +776,7 @@ public class AssignmentAction extends PagedResourceActionII
 
 		String mode = (String) state.getAttribute(STATE_MODE);
 
-		if (!mode.equals(MODE_LIST_ASSIGNMENTS))
+		if (!MODE_LIST_ASSIGNMENTS.equals(mode))
 		{
 			// allow grade assignment?
 			if (state.getAttribute(STATE_ALLOW_GRADE_SUBMISSION) == null)
@@ -778,17 +786,17 @@ public class AssignmentAction extends PagedResourceActionII
 			context.put("allowGradeSubmission", state.getAttribute(STATE_ALLOW_GRADE_SUBMISSION));
 		}
 
-		if (mode.equals(MODE_LIST_ASSIGNMENTS))
+		if (MODE_LIST_ASSIGNMENTS.equals(mode))
 		{
 			// build the context for the student assignment view
 			template = build_list_assignments_context(portlet, context, data, state);
 		}
-		else if (mode.equals(MODE_STUDENT_VIEW_ASSIGNMENT))
+		else if (MODE_STUDENT_VIEW_ASSIGNMENT.equals(mode))
 		{
 			// the student view of assignment
 			template = build_student_view_assignment_context(portlet, context, data, state);
 		}
-		else if (mode.equals(MODE_STUDENT_VIEW_SUBMISSION))
+		else if (MODE_STUDENT_VIEW_SUBMISSION.equals(mode))
 		{
 			// disable auto-updates while leaving the list view
 			justDelivered(state);
@@ -796,12 +804,12 @@ public class AssignmentAction extends PagedResourceActionII
 			// build the context for showing one assignment submission
 			template = build_student_view_submission_context(portlet, context, data, state);
 		}
-		else if (mode.equals(MODE_STUDENT_VIEW_SUBMISSION_CONFIRMATION))
+		else if (MODE_STUDENT_VIEW_SUBMISSION_CONFIRMATION.equals(mode))
 		{
 			// build the context for showing one assignment submission confirmation
 			template = build_student_view_submission_confirmation_context(portlet, context, data, state);
 		}
-		else if (mode.equals(MODE_STUDENT_PREVIEW_SUBMISSION))
+		else if (MODE_STUDENT_PREVIEW_SUBMISSION.equals(mode))
 		{
 			// build the context for showing one assignment submission
 			template = build_student_preview_submission_context(portlet, context, data, state);
@@ -810,11 +818,11 @@ public class AssignmentAction extends PagedResourceActionII
 		{
 			// disable auto-updates while leaving the list view
 			justDelivered(state);
-
+			
 			// build the context for showing one graded submission
 			template = build_student_view_grade_context(portlet, context, data, state);
 		}
-		else if (mode.equals(MODE_INSTRUCTOR_NEW_EDIT_ASSIGNMENT))
+		else if (MODE_INSTRUCTOR_NEW_EDIT_ASSIGNMENT.equals(mode))
 		{
 			// allow add assignment?
 			boolean allowAddSiteAssignment = AssignmentService.allowAddSiteAssignment(contextString);
@@ -826,7 +834,7 @@ public class AssignmentAction extends PagedResourceActionII
 			// build the context for the instructor's create new assignment view
 			template = build_instructor_new_edit_assignment_context(portlet, context, data, state);
 		}
-		else if (mode.equals(MODE_INSTRUCTOR_DELETE_ASSIGNMENT))
+		else if (MODE_INSTRUCTOR_DELETE_ASSIGNMENT.equals(mode))
 		{
 			if (state.getAttribute(DELETE_ASSIGNMENT_IDS) != null)
 			{
@@ -837,7 +845,7 @@ public class AssignmentAction extends PagedResourceActionII
 				template = build_instructor_delete_assignment_context(portlet, context, data, state);
 			}
 		}
-		else if (mode.equals(MODE_INSTRUCTOR_GRADE_ASSIGNMENT))
+		else if (MODE_INSTRUCTOR_GRADE_ASSIGNMENT.equals(mode))
 		{
 			if (allowGradeSubmission != null && ((Boolean) allowGradeSubmission).booleanValue())
 			{
@@ -845,7 +853,7 @@ public class AssignmentAction extends PagedResourceActionII
 				template = build_instructor_grade_assignment_context(portlet, context, data, state);
 			}
 		}
-		else if (mode.equals(MODE_INSTRUCTOR_GRADE_SUBMISSION))
+		else if (MODE_INSTRUCTOR_GRADE_SUBMISSION.equals(mode))
 		{
 			if (allowGradeSubmission != null && ((Boolean) allowGradeSubmission).booleanValue())
 			{
@@ -856,7 +864,7 @@ public class AssignmentAction extends PagedResourceActionII
 				template = build_instructor_grade_submission_context(portlet, context, data, state);
 			}
 		}
-		else if (mode.equals(MODE_INSTRUCTOR_PREVIEW_GRADE_SUBMISSION))
+		else if (MODE_INSTRUCTOR_PREVIEW_GRADE_SUBMISSION.equals(mode))
 		{
 			if ( allowGradeSubmission != null && ((Boolean) allowGradeSubmission).booleanValue())
 			{
@@ -864,12 +872,12 @@ public class AssignmentAction extends PagedResourceActionII
 				template = build_instructor_preview_grade_submission_context(portlet, context, data, state);
 			}
 		}
-		else if (mode.equals(MODE_INSTRUCTOR_PREVIEW_ASSIGNMENT))
+		else if (MODE_INSTRUCTOR_PREVIEW_ASSIGNMENT.equals(mode))
 		{
 			// build the context for preview one assignment
 			template = build_instructor_preview_assignment_context(portlet, context, data, state);
 		}
-		else if (mode.equals(MODE_INSTRUCTOR_VIEW_ASSIGNMENT))
+		else if (MODE_INSTRUCTOR_VIEW_ASSIGNMENT.equals(mode))
 		{
 			// disable auto-updates while leaving the list view
 			justDelivered(state);
@@ -877,7 +885,7 @@ public class AssignmentAction extends PagedResourceActionII
 			// build the context for view one assignment
 			template = build_instructor_view_assignment_context(portlet, context, data, state);
 		}
-		else if (mode.equals(MODE_INSTRUCTOR_VIEW_STUDENTS_ASSIGNMENT))
+		else if (MODE_INSTRUCTOR_VIEW_STUDENTS_ASSIGNMENT.equals(mode))
 		{
 			if ( allowGradeSubmission != null && ((Boolean) allowGradeSubmission).booleanValue())
 			{
@@ -885,7 +893,7 @@ public class AssignmentAction extends PagedResourceActionII
 				template = build_instructor_view_students_assignment_context(portlet, context, data, state);
 			}
 		}
-		else if (mode.equals(MODE_INSTRUCTOR_REPORT_SUBMISSIONS))
+		else if (MODE_INSTRUCTOR_REPORT_SUBMISSIONS.equals(mode))
 		{
 			if ( allowGradeSubmission != null && ((Boolean) allowGradeSubmission).booleanValue())
 			{
@@ -893,7 +901,7 @@ public class AssignmentAction extends PagedResourceActionII
 				template = build_instructor_report_submissions(portlet, context, data, state);
 			}
 		}
-		else if (mode.equals(MODE_INSTRUCTOR_UPLOAD_ALL))
+		else if (MODE_INSTRUCTOR_UPLOAD_ALL.equals(mode))
 		{
 			if ( allowGradeSubmission != null && ((Boolean) allowGradeSubmission).booleanValue())
 			{
@@ -901,7 +909,7 @@ public class AssignmentAction extends PagedResourceActionII
 				template = build_instructor_upload_all(portlet, context, data, state);
 			}
 		}
-		else if (mode.equals(MODE_INSTRUCTOR_REORDER_ASSIGNMENT))
+		else if (MODE_INSTRUCTOR_REORDER_ASSIGNMENT.equals(mode))
 		{
 			// disable auto-updates while leaving the list view
 			justDelivered(state);
@@ -1499,16 +1507,18 @@ public class AssignmentAction extends PagedResourceActionII
 		context.put("name_CheckAddHonorPledge", NEW_ASSIGNMENT_CHECK_ADD_HONOR_PLEDGE);
 
 		// set the values
-		String assignmentId = "";
 		Assignment a = null;
-		try
+		String assignmentRef = (String) state.getAttribute(EDIT_ASSIGNMENT_ID);
+		if (assignmentRef != null)
 		{
-			a = AssignmentService.getAssignment((String) state.getAttribute(EDIT_ASSIGNMENT_ID));
-			assignmentId = a.getId();
-		}
-		catch (Exception ee)
-		{
-			M_log.warn(this + ":setAssignmentFormContext " + ee.getMessage());
+			try
+			{
+				a = AssignmentService.getAssignment(assignmentRef);
+			}
+			catch (Exception ee)
+			{
+				M_log.warn(this + ":setAssignmentFormContext " + ee.getMessage());
+			}
 		}
 		
 		// put the re-submission info into context
@@ -1673,13 +1683,22 @@ public class AssignmentAction extends PagedResourceActionII
 		context.put("allowGroupAssignmentsInGradebook", new Boolean(AssignmentService.getAllowGroupAssignmentsInGradebook()));
 
 		// the notification email choices
-		if (state.getAttribute(ASSIGNMENT_INSTRUCTOR_NOTIFICATIONS) != null && ((Boolean) state.getAttribute(ASSIGNMENT_INSTRUCTOR_NOTIFICATIONS)).booleanValue())
+		// whether the choice of emails instructor submission notification is available in the installation
+		// system installation allowed assignment submission notification
+		boolean allowNotification = ServerConfigurationService.getBoolean(ASSIGNMENT_INSTRUCTOR_NOTIFICATIONS, true);
+		if (allowNotification)
+		{
+			// whether current user can receive notification. If not, don't show the notification choices in the create/edit assignment page
+			allowNotification = AssignmentService.allowReceiveSubmissionNotification(contextString);
+		}
+		if (allowNotification)
 		{
 			context.put("name_assignment_instructor_notifications", ASSIGNMENT_INSTRUCTOR_NOTIFICATIONS);
 			if (state.getAttribute(Assignment.ASSIGNMENT_INSTRUCTOR_NOTIFICATIONS_VALUE) == null)
 			{
 				// set the notification value using site default
-				state.setAttribute(Assignment.ASSIGNMENT_INSTRUCTOR_NOTIFICATIONS_VALUE, state.getAttribute(ASSIGNMENT_INSTRUCTOR_NOTIFICATIONS_DEFAULT));
+				// whether or how the instructor receive submission notification emails, none(default)|each|digest
+				state.setAttribute(Assignment.ASSIGNMENT_INSTRUCTOR_NOTIFICATIONS_VALUE, ServerConfigurationService.getString(ASSIGNMENT_INSTRUCTOR_NOTIFICATIONS_DEFAULT, Assignment.ASSIGNMENT_INSTRUCTOR_NOTIFICATIONS_NONE));
 			}
 			context.put("value_assignment_instructor_notifications", state.getAttribute(Assignment.ASSIGNMENT_INSTRUCTOR_NOTIFICATIONS_VALUE));
 			// the option values
@@ -1848,6 +1867,7 @@ public class AssignmentAction extends PagedResourceActionII
 	{
 		Vector assignments = new Vector();
 		Vector assignmentIds = (Vector) state.getAttribute(DELETE_ASSIGNMENT_IDS);
+		Hashtable<String, Integer> submissionCountTable = new Hashtable<String, Integer>();
 		for (int i = 0; i < assignmentIds.size(); i++)
 		{
 			try
@@ -1855,12 +1875,23 @@ public class AssignmentAction extends PagedResourceActionII
 				Assignment a = AssignmentService.getAssignment((String) assignmentIds.get(i));
 
 				Iterator submissions = AssignmentService.getSubmissions(a).iterator();
-				if (submissions.hasNext())
+				int submittedCount = 0;
+				while (submissions.hasNext())
+				{
+					AssignmentSubmission s = (AssignmentSubmission) submissions.next();
+					if (s.getSubmitted() && s.getTimeSubmitted() != null)
+					{
+						submittedCount++;
+					}
+				}
+				if (submittedCount > 0)
 				{
 					// if there is submission to the assignment, show the alert
 					addAlert(state, rb.getString("areyousur") + " \"" + a.getTitle() + "\" " + rb.getString("whihassub") + "\n");
 				}
 				assignments.add(a);
+				submissionCountTable.put(a.getReference(), Integer.valueOf(submittedCount));
+				
 			}
 			catch (IdUnusedException e)
 			{
@@ -1876,6 +1907,7 @@ public class AssignmentAction extends PagedResourceActionII
 		context.put("assignments", assignments);
 		context.put("service", AssignmentService.getInstance());
 		context.put("currentTime", TimeService.newTime());
+		context.put("submissionCountTable", submissionCountTable);
 
 		String template = (String) getContext(data).get("template");
 		return template + TEMPLATE_INSTRUCTOR_DELETE_ASSIGNMENT;
@@ -1903,7 +1935,6 @@ public class AssignmentAction extends PagedResourceActionII
 			if (a.getContent() != null)
 			{
 				gradeType = a.getContent().getTypeOfGrade();
-				context.put("value_SubmissionType", gradeType);
 			}
 		}
 		catch (IdUnusedException e)
@@ -2003,7 +2034,6 @@ public class AssignmentAction extends PagedResourceActionII
 				: state.getAttribute(GRADE_SUBMISSION_GRADE));
 
 		context.put("assignment_expand_flag", state.getAttribute(GRADE_SUBMISSION_ASSIGNMENT_EXPAND_FLAG));
-		context.put("gradingAttachments", state.getAttribute(ATTACHMENTS));
 
 		// is this a non-electronic submission type of assignment
 		context.put("nonElectronic", (a!=null && a.getContent().getTypeOfSubmission() == Assignment.NON_ELECTRONIC_ASSIGNMENT_SUBMISSION)?Boolean.TRUE:Boolean.FALSE);
@@ -2066,16 +2096,38 @@ public class AssignmentAction extends PagedResourceActionII
 	} // build_instructor_grade_submission_context
 	
 	/**
-	 * Responding to the request of going to next submission
+	 * Responding to the request of submission navigation
+	 * @param rundata
+	 * @param option
 	 */
-	public void doNext_submission(RunData rundata)
+	public void doPrev_back_next_submission(RunData rundata, String option)
 	{
 		SessionState state = ((JetspeedRunData) rundata).getPortletSessionState(((JetspeedRunData) rundata).getJs_peid());
+
+		// save the instructor input
+		boolean hasChange = readGradeForm(rundata, state, "save");
+		if (state.getAttribute(STATE_MESSAGE) == null && hasChange)
+		{
+			grade_submission_option(rundata, "save");
+		}
 		
 		if (state.getAttribute(STATE_MESSAGE) == null)
-			navigateToSubmission(rundata, "nextSubmissionId");
+		{
+			if ("next".equals(option))
+			{
+				navigateToSubmission(rundata, "nextSubmissionId");
+			}
+			else if ("prev".equals(option))
+			{
+				navigateToSubmission(rundata, "prevSubmissionId");
+			}
+			else if ("back".equals(option))
+			{
+				state.setAttribute(STATE_MODE, MODE_INSTRUCTOR_GRADE_ASSIGNMENT);
+			}
+		}
 
-	} // doNext_submission
+	} // doPrev_back_next_submission
 
 
 	private void navigateToSubmission(RunData rundata, String paramString) {
@@ -2089,18 +2141,6 @@ public class AssignmentAction extends PagedResourceActionII
 			putSubmissionInfoIntoState(state, assignmentId, submissionId);
 		}
 	}
-
-	/**
-	 * Responding to the request of going to previous submission
-	 */
-	public void doPrev_submission(RunData rundata)
-	{
-		SessionState state = ((JetspeedRunData) rundata).getPortletSessionState(((JetspeedRunData) rundata).getJs_peid());
-
-		if (state.getAttribute(STATE_MESSAGE) == null)
-			navigateToSubmission(rundata, "prevSubmissionId");
-
-	} // doPrev_submission
 
 	/**
 	 * Parse time value and put corresponding values into state
@@ -2298,11 +2338,8 @@ public class AssignmentAction extends PagedResourceActionII
 				context.put("defaultGrade", defaultGrade);
 			}
 			
-			// groups
-			if (state.getAttribute(VIEW_SUBMISSION_LIST_OPTION) == null)
-			{
-				state.setAttribute(VIEW_SUBMISSION_LIST_OPTION, rb.getString("gen.viewallgroupssections"));
-			}
+			initViewSubmissionListOption(state);
+			
 			String view = (String)state.getAttribute(VIEW_SUBMISSION_LIST_OPTION);
 			context.put("view", view);
 			// access point url for zip file download
@@ -2392,6 +2429,17 @@ public class AssignmentAction extends PagedResourceActionII
 		return template + TEMPLATE_INSTRUCTOR_GRADE_ASSIGNMENT;
 
 	} // build_instructor_grade_assignment_context
+
+	/**
+	 * make sure the state variable VIEW_SUBMISSION_LIST_OPTION is not null
+	 * @param state
+	 */
+	private void initViewSubmissionListOption(SessionState state) {
+		if (state.getAttribute(VIEW_SUBMISSION_LIST_OPTION) == null)
+		{
+			state.setAttribute(VIEW_SUBMISSION_LIST_OPTION, rb.getString("gen.viewallgroupssections"));
+		}
+	}
 
 	/**
 	 * put the supplement item information into context
@@ -2767,7 +2815,7 @@ public class AssignmentAction extends PagedResourceActionII
 					catch (ConflictingAssignmentNameException e)
 					{
 						// add alert prompting for change assignment title
-						addAlert(state, rb.getString("addtogradebook.nonUniqueTitle"));
+						addAlert(state, rb.getFormattedMessage("addtogradebook.nonUniqueTitle", new Object[]{"\"" + newAssignment_title + "\""}));
 						M_log.warn(this + ":integrateGradebook " + e.getMessage());
 					}
 					catch (ConflictingExternalIdException e)
@@ -3249,17 +3297,6 @@ public class AssignmentAction extends PagedResourceActionII
 		putSubmissionInfoIntoState(state, assignmentId, sId);
 		state.setAttribute(STATE_MODE, MODE_INSTRUCTOR_GRADE_SUBMISSION);
 	} // doCancel_grade_submission
-	
-	/**
-	 * back to the submission list view
-	 * @param data
-	 */
-	public void doBack_to_submission_list(RunData data)
-	{
-		// put submission information into state
-		SessionState state = ((JetspeedRunData) data).getPortletSessionState(((JetspeedRunData) data).getJs_peid());
-		state.setAttribute(STATE_MODE, MODE_INSTRUCTOR_GRADE_ASSIGNMENT);
-	} // doBack_to_submission_list
 
 	/**
 	 * clean the state variables related to grading page
@@ -3854,7 +3891,7 @@ public class AssignmentAction extends PagedResourceActionII
 							// for resubmissions
 							// when resubmit, keep the Returned flag on till the instructor grade again.
 							Time now = TimeService.newTime();
-							if (sEdit.getGraded())
+							if (sEdit.getGraded() && sEdit.getReturned() && sEdit.getGradeReleased())
 							{
 								// add the current grade into previous grade histroy
 								String previousGrades = (String) sEdit.getProperties().getProperty(
@@ -4098,6 +4135,12 @@ public class AssignmentAction extends PagedResourceActionII
 				addAlert(state, rb.getString("youarenot2"));
 				state.setAttribute(STATE_MODE, MODE_LIST_ASSIGNMENTS);
 			}
+			
+			// reset the global navigaion alert flag
+			if (state.getAttribute(ALERT_GLOBAL_NAVIGATION) != null)
+			{
+				state.removeAttribute(ALERT_GLOBAL_NAVIGATION);
+			}
 		}
 
 	} // doNew_Assignment
@@ -4125,6 +4168,12 @@ public class AssignmentAction extends PagedResourceActionII
 				addAlert(state, rb.getString("youarenot19"));
 				state.setAttribute(STATE_MODE, MODE_LIST_ASSIGNMENTS);
 			}
+			
+			// reset the global navigaion alert flag
+			if (state.getAttribute(ALERT_GLOBAL_NAVIGATION) != null)
+			{
+				state.removeAttribute(ALERT_GLOBAL_NAVIGATION);
+			}
 		}
 
 	} // doReorder
@@ -4148,7 +4197,7 @@ public class AssignmentAction extends PagedResourceActionII
 		String order = params.getString(NEW_ASSIGNMENT_ORDER);
 		state.setAttribute(NEW_ASSIGNMENT_ORDER, order);
 
-		if (title.length() == 0)
+		if (title == null || title.length() == 0)
 		{
 			// empty assignment title
 			addAlert(state, rb.getString("plespethe1"));
@@ -4306,6 +4355,19 @@ public class AssignmentAction extends PagedResourceActionII
 		}
 
 		List attachments = (List) state.getAttribute(ATTACHMENTS);
+		if (attachments == null || attachments.isEmpty())
+		{
+			// read from vm file
+			String[] attachmentIds = data.getParameters().getStrings("attachments");
+			if (attachmentIds != null && attachmentIds.length != 0)
+			{
+				attachments = new Vector();
+				for (int i= 0; i<attachmentIds.length;i++)
+				{
+					attachments.add(EntityManager.newReference(attachmentIds[i]));
+				}
+			}
+		}
 		state.setAttribute(NEW_ASSIGNMENT_ATTACHMENT, attachments);
 
 		if (validify)
@@ -4373,31 +4435,143 @@ public class AssignmentAction extends PagedResourceActionII
 			state.setAttribute(Assignment.ASSIGNMENT_INSTRUCTOR_NOTIFICATIONS_VALUE, notiOption);
 		}
 		
-		if (StringUtil.trimToNull(params.getString("modelanswer_text")) != null)
+		// read inputs for supplement items
+		setNewAssignmentParametersSupplementItems(validify, state, params);
+		
+		if (state.getAttribute(WITH_GRADES) != null && ((Boolean) state.getAttribute(WITH_GRADES)).booleanValue())
 		{
-			state.setAttribute(MODELANSWER_TEXT, params.getString("modelanswer_text"));
-		}
-		if (StringUtil.trimToNull(params.getString("modelanswer_showto")) != null)
-		{
-			state.setAttribute(MODELANSWER_SHOWTO, params.getString("modelanswer_showto"));
+			// the grade point
+			String gradePoints = params.getString(NEW_ASSIGNMENT_GRADE_POINTS);
+			state.setAttribute(NEW_ASSIGNMENT_GRADE_POINTS, gradePoints);
+			if (gradePoints != null)
+			{
+				if (gradeType == 3)
+				{
+					if ((gradePoints.length() == 0))
+					{
+						// in case of point grade assignment, user must specify maximum grade point
+						addAlert(state, rb.getString("plespethe3"));
+					}
+					else
+					{
+						validPointGrade(state, gradePoints);
+						// when scale is points, grade must be integer and less than maximum value
+						if (state.getAttribute(STATE_MESSAGE) == null)
+						{
+							gradePoints = scalePointGrade(state, gradePoints);
+						}
+						state.setAttribute(NEW_ASSIGNMENT_GRADE_POINTS, gradePoints);
+					}
+				}
+			}
 		}
 		
-		if (StringUtil.trimToNull(params.getString("note_text")) != null)
+	} // setNewAssignmentParameters
+
+	/**
+	 * read inputs for supplement items
+	 * @param validify
+	 * @param state
+	 * @param params
+	 */
+	private void setNewAssignmentParametersSupplementItems(boolean validify,
+			SessionState state, ParameterParser params) {
+		/********************* MODEL ANSWER ITEM *********************/
+		String modelAnswer_to_delete = StringUtil.trimToNull(params.getString("modelanswer_to_delete"));
+		if (modelAnswer_to_delete != null)
 		{
-			state.setAttribute(NOTE_TEXT, StringUtil.trimToNull(params.getString("note_text")));
+			state.setAttribute(MODELANSWER_TO_DELETE, modelAnswer_to_delete);
 		}
-		if (StringUtil.trimToNull(params.getString("note_to")) != null)
+		String modelAnswer_text = StringUtil.trimToNull(params.getString("modelanswer_text"));
+		if (modelAnswer_text != null)
 		{
-			state.setAttribute(NOTE_SHAREWITH, StringUtil.trimToNull(params.getString("note_to")));
+			state.setAttribute(MODELANSWER_TEXT, modelAnswer_text);
+		}
+		String modelAnswer_showto = StringUtil.trimToNull(params.getString("modelanswer_showto"));
+		if (modelAnswer_showto != null)
+		{
+			state.setAttribute(MODELANSWER_SHOWTO, modelAnswer_showto);
+		}
+		if (modelAnswer_text != null || !"0".equals(modelAnswer_showto) || state.getAttribute(MODELANSWER_ATTACHMENTS) != null)
+		{
+			// there is Model Answer input
+			state.setAttribute(MODELANSWER, Boolean.TRUE);
+			
+			if (validify && !"true".equalsIgnoreCase(modelAnswer_to_delete))
+			{
+				// show alert when there is no model answer input
+				if (modelAnswer_text == null)
+				{
+					addAlert(state, rb.getString("modelAnswer.alert.modelAnswer"));
+				}
+				// show alert when user didn't select show-to option
+				if ("0".equals(modelAnswer_showto))
+				{
+					addAlert(state, rb.getString("modelAnswer.alert.showto"));
+				}
+			}
+		}
+		else
+		{
+			state.removeAttribute(MODELANSWER);
 		}
 		
-		if (StringUtil.trimToNull(params.getString("allPurposeTitle")) != null)
+		/**************** NOTE ITEM ********************/
+		String note_to_delete = StringUtil.trimToNull(params.getString("note_to_delete"));
+		if (note_to_delete != null)
 		{
-			state.setAttribute(ALLPURPOSE_TITLE, StringUtil.trimToNull(params.getString("allPurposeTitle")));
+			state.setAttribute(NOTE_TO_DELETE, note_to_delete);
 		}
-		if (StringUtil.trimToNull(params.getString("allPurposeText")) != null)
+		String note_text = StringUtil.trimToNull(params.getString("note_text"));
+		if (note_text != null)
 		{
-			state.setAttribute(ALLPURPOSE_TEXT, StringUtil.trimToNull(params.getString("allPurposeText")));
+			state.setAttribute(NOTE_TEXT, note_text);
+		}
+		String note_to = StringUtil.trimToNull(params.getString("note_to"));
+		if (note_to != null)
+		{
+			state.setAttribute(NOTE_SHAREWITH, note_to);
+		}
+		if (note_text != null || !"0".equals(note_to))
+		{
+			// there is Note Item input
+			state.setAttribute(NOTE, Boolean.TRUE);
+			
+			if (validify && !"true".equalsIgnoreCase(note_to_delete))
+			{
+				// show alert when there is no note text
+				if (note_text == null)
+				{
+					addAlert(state, rb.getString("note.alert.text"));
+				}
+				// show alert when there is no share option
+				if ("0".equals(note_to))
+				{
+					addAlert(state, rb.getString("note.alert.to"));
+				}
+			}
+		}
+		else
+		{
+			state.removeAttribute(NOTE);
+		}
+		
+		
+		/****************** ALL PURPOSE ITEM **********************/
+		String allPurpose_to_delete = StringUtil.trimToNull(params.getString("allPurpose_to_delete"));
+		if ( allPurpose_to_delete != null)
+		{
+			state.setAttribute(ALLPURPOSE_TO_DELETE, allPurpose_to_delete);
+		}
+		String allPurposeTitle = StringUtil.trimToNull(params.getString("allPurposeTitle"));
+		if (allPurposeTitle != null)
+		{
+			state.setAttribute(ALLPURPOSE_TITLE, allPurposeTitle);
+		}
+		String allPurposeText = StringUtil.trimToNull(params.getString("allPurposeText"));
+		if (allPurposeText != null)
+		{
+			state.setAttribute(ALLPURPOSE_TEXT, allPurposeText);
 		}
 		if (StringUtil.trimToNull(params.getString("allPurposeHide")) != null)
 		{
@@ -4455,39 +4629,39 @@ public class AssignmentAction extends PagedResourceActionII
 		}
 		catch (Exception e)
 		{
-			M_log.warn(this + ":postOrSaveAssignment " + e.toString() + "error finding authzGroup for = " + siteId);
+			M_log.warn(this + ":setNewAssignmentParameters" + e.toString() + "error finding authzGroup for = " + siteId);
 		}
 		state.setAttribute(ALLPURPOSE_ACCESS, accessList);
-		
-		if (state.getAttribute(WITH_GRADES) != null && ((Boolean) state.getAttribute(WITH_GRADES)).booleanValue())
+	
+		if (allPurposeTitle != null || allPurposeText != null || (accessList != null && !accessList.isEmpty()) || state.getAttribute(ALLPURPOSE_ATTACHMENTS) != null)
 		{
-			// the grade point
-			String gradePoints = params.getString(NEW_ASSIGNMENT_GRADE_POINTS);
-			state.setAttribute(NEW_ASSIGNMENT_GRADE_POINTS, gradePoints);
-			if (gradePoints != null)
+			// there is allpupose item input
+			state.setAttribute(ALLPURPOSE, Boolean.TRUE);
+			
+			if (validify && !"true".equalsIgnoreCase(allPurpose_to_delete))
 			{
-				if (gradeType == 3)
+				if (allPurposeTitle == null)
 				{
-					if ((gradePoints.length() == 0))
-					{
-						// in case of point grade assignment, user must specify maximum grade point
-						addAlert(state, rb.getString("plespethe3"));
-					}
-					else
-					{
-						validPointGrade(state, gradePoints);
-						// when scale is points, grade must be integer and less than maximum value
-						if (state.getAttribute(STATE_MESSAGE) == null)
-						{
-							gradePoints = scalePointGrade(state, gradePoints);
-						}
-						state.setAttribute(NEW_ASSIGNMENT_GRADE_POINTS, gradePoints);
-					}
+					// missing title
+					addAlert(state, rb.getString("allPurpose.alert.title"));
+				}
+				if (allPurposeText == null)
+				{
+					// missing text
+					addAlert(state, rb.getString("allPurpose.alert.text"));
+				}
+				if (accessList == null || accessList.isEmpty())
+				{
+					// missing access choice
+					addAlert(state, rb.getString("allPurpose.alert.access"));
 				}
 			}
 		}
-		
-	} // setNewAssignmentParameters
+		else
+		{
+			state.removeAttribute(ALLPURPOSE);
+		}
+	}
 	
 	/**
 	 * read time input and assign it to state attributes
@@ -4644,7 +4818,7 @@ public class AssignmentAction extends PagedResourceActionII
 	public void doPost_assignment(RunData data)
 	{
 		// post assignment
-		postOrSaveAssignment(data, "post");
+		post_save_assignment(data, "post");
 
 	} // doPost_assignment
 
@@ -4742,7 +4916,7 @@ public class AssignmentAction extends PagedResourceActionII
 	/**
 	 * post or save assignment
 	 */
-	private void postOrSaveAssignment(RunData data, String postOrSave)
+	private void post_save_assignment(RunData data, String postOrSave)
 	{
 		SessionState state = ((JetspeedRunData) data).getPortletSessionState(((JetspeedRunData) data).getJs_peid());
 		
@@ -4759,7 +4933,7 @@ public class AssignmentAction extends PagedResourceActionII
 		String oAssociateGradebookAssignment = null;
 
 		String mode = (String) state.getAttribute(STATE_MODE);
-		if (!mode.equals(MODE_INSTRUCTOR_PREVIEW_ASSIGNMENT))
+		if (!MODE_INSTRUCTOR_PREVIEW_ASSIGNMENT.equals(mode))
 		{
 			// read input data if the mode is not preview mode
 			setNewAssignmentParameters(data, true);
@@ -4838,8 +5012,7 @@ public class AssignmentAction extends PagedResourceActionII
 			boolean allowStudentViewReport = "true".equalsIgnoreCase((String) state.getAttribute(NEW_ASSIGNMENT_ALLOW_STUDENT_VIEW));
 			
 			// the attachments
-			List attachments = (List) state.getAttribute(ATTACHMENTS);
-			List attachments1 = EntityManager.newReferenceList(attachments);
+			List attachments = (List) state.getAttribute(NEW_ASSIGNMENT_ATTACHMENT);
 			
 			// set group property
 			String range = (String) state.getAttribute(NEW_ASSIGNMENT_RANGE);
@@ -4864,7 +5037,7 @@ public class AssignmentAction extends PagedResourceActionII
 			}
 			catch (Exception e)
 			{
-				M_log.warn(this + ":postOrSaveAssignment " + e.getMessage());
+				M_log.warn(this + ":post_save_assignment " + e.getMessage());
 			}
 
 
@@ -4877,7 +5050,7 @@ public class AssignmentAction extends PagedResourceActionII
 				Time oldDueTime = a.getDueTime();
 				
 				// commit the changes to AssignmentContent object
-				commitAssignmentContentEdit(state, ac, title, submissionType,useReviewService,allowStudentViewReport, gradeType, gradePoints, description, checkAddHonorPledge, attachments1);
+				commitAssignmentContentEdit(state, ac, title, submissionType,useReviewService,allowStudentViewReport, gradeType, gradePoints, description, checkAddHonorPledge, attachments);
 				
 				// set the Assignment Properties object
 				ResourcePropertiesEdit aPropertiesEdit = a.getPropertiesEdit();
@@ -4940,188 +5113,214 @@ public class AssignmentAction extends PagedResourceActionII
 								}
 								catch (Exception e)
 								{
-									M_log.warn(this + ":postOrSaveAssignment " + e.getMessage() + s.getReference());
+									M_log.warn(this + ":post_save_assignment " + e.getMessage() + s.getReference());
 								}
 							}
 						}
 								
 					}
-						
-
-					// add the due date to schedule if the schedule exists
-					integrateWithCalendar(state, a, title, dueTime, checkAddDueTime, oldDueTime, aPropertiesEdit);
-
-					// the open date been announced
-					integrateWithAnnouncement(state, aOldTitle, a, title, openTime, checkAutoAnnounce, oldOpenTime);
-
-					// integrate with Gradebook
-					try
-					{
-						initIntegrateWithGradebook(state, siteId, aOldTitle, oAssociateGradebookAssignment, a, title, dueTime, gradeType, gradePoints, addtoGradebook, associateGradebookAssignment, range);
-					}
-					catch (AssignmentHasIllegalPointsException e)
-					{
-						addAlert(state, rb.getString("addtogradebook.illegalPoints"));
-						M_log.warn(this + ":postOrSaveAssignment " + e.getMessage());
-					}
 	
 				} //if
 				
-				// assignment supplement items
-				String aId = a.getId();
-				//model answer
-				if ("true".equals(params.getString("modelanswer_to_delete")))
+				// save supplement item information
+				saveAssignmentSupplementItem(state, params, siteId, a);
+				
+				// set default sorting
+				setDefaultSort(state);
+				
+				if (state.getAttribute(STATE_MESSAGE) == null)
 				{
-					// to delete the model answer
-					AssignmentModelAnswerItem mAnswer = m_assignmentSupplementItemService.getModelAnswer(aId);
-					if (mAnswer != null)
-						m_assignmentSupplementItemService.removeModelAnswer(mAnswer);
-				}
-				else if (StringUtil.trimToNull(params.getString("modelanswer_text")) != null)
-				{
-					// edit/add model answer
-					AssignmentModelAnswerItem mAnswer = m_assignmentSupplementItemService.getModelAnswer(aId);
-					if (mAnswer == null)
-					{
-						mAnswer = m_assignmentSupplementItemService.newModelAnswer();
-						m_assignmentSupplementItemService.saveModelAnswer(mAnswer);
-					}
-					mAnswer.setAssignmentId(a.getId());
-					mAnswer.setText(StringUtil.trimToNull(params.getString("modelanswer_text")));
-					mAnswer.setShowTo(params.getInt("modelanswer_showto"));
-					mAnswer.setAttachmentSet(getAssignmentSupplementItemAttachment(state, mAnswer, MODELANSWER_ATTACHMENTS));
-					m_assignmentSupplementItemService.saveModelAnswer(mAnswer);
-				}
-				// note
-				if ("true".equals(params.getString("note_to_delete")))
-				{
-					// to remove note item
-					AssignmentNoteItem nNote = m_assignmentSupplementItemService.getNoteItem(aId);
-					if (nNote != null)
-						m_assignmentSupplementItemService.removeNoteItem(nNote);
-				}
-				else if (StringUtil.trimToNull(params.getString("note_text")) != null)
-				{
-					// edit/add private note
-					AssignmentNoteItem nNote = m_assignmentSupplementItemService.getNoteItem(aId);
-					if (nNote == null)
-						nNote = m_assignmentSupplementItemService.newNoteItem();
-					nNote.setAssignmentId(a.getId());
-					nNote.setNote(StringUtil.trimToNull(params.getString("note_text")));
-					nNote.setShareWith(params.getInt("note_to"));
-					nNote.setCreatorId(UserDirectoryService.getCurrentUser().getId());
-					m_assignmentSupplementItemService.saveNoteItem(nNote);
-				}
-				// all purpose
-				if ("true".equals(params.getString("allPurpose_to_delete")))
-				{
-					// to remove allPurpose item
-					AssignmentAllPurposeItem nAllPurpose = m_assignmentSupplementItemService.getAllPurposeItem(aId);
-					if (nAllPurpose != null)
-						m_assignmentSupplementItemService.removeAllPurposeItem(nAllPurpose);
-				}
-				else if (StringUtil.trimToNull(params.getString("allPurposeTitle")) != null)
-				{
-					// edit/add private note
-					AssignmentAllPurposeItem nAllPurpose = m_assignmentSupplementItemService.getAllPurposeItem(aId);
-					if (nAllPurpose == null)
-					{
-						nAllPurpose = m_assignmentSupplementItemService.newAllPurposeItem();
-						m_assignmentSupplementItemService.saveAllPurposeItem(nAllPurpose);
-					}
-					nAllPurpose.setAssignmentId(a.getId());
-					nAllPurpose.setTitle(StringUtil.trimToNull(params.getString("allPurposeTitle")));
-					nAllPurpose.setText(StringUtil.trimToNull(params.getString("allPurposeText")));
-					nAllPurpose.setHide(params.getBoolean("allPurposeHide"));
+					// set the state navigation variables
+					state.setAttribute(STATE_MODE, MODE_LIST_ASSIGNMENTS);
+					state.setAttribute(ATTACHMENTS, EntityManager.newReferenceList());
+					resetAssignment(state);
 					
-					// save the release and retract dates
-					if (params.getBoolean("allPurposeShowFrom") && !params.getBoolean("allPurposeHide"))
+					// integrate with other tools only if the assignment is posted
+					if (post)
 					{
-						// save release date
-						Time releaseTime = getTimeFromState(state, ALLPURPOSE_RELEASE_MONTH, ALLPURPOSE_RELEASE_DAY, ALLPURPOSE_RELEASE_YEAR, ALLPURPOSE_RELEASE_HOUR, ALLPURPOSE_RELEASE_MIN, ALLPURPOSE_RELEASE_AMPM);
-						GregorianCalendar cal = new GregorianCalendar();
-						cal.setTimeInMillis(releaseTime.getTime());
-						nAllPurpose.setReleaseDate(cal.getTime());
-					}
-					else
-					{
-						nAllPurpose.setReleaseDate(null);
-					}
-					if (params.getBoolean("allPurposeShowTo") && !params.getBoolean("allPurposeHide"))
-					{
-						// save retract date
-						Time retractTime = getTimeFromState(state, ALLPURPOSE_RETRACT_MONTH, ALLPURPOSE_RETRACT_DAY, ALLPURPOSE_RETRACT_YEAR, ALLPURPOSE_RETRACT_HOUR, ALLPURPOSE_RETRACT_MIN, ALLPURPOSE_RETRACT_AMPM);
-						GregorianCalendar cal = new GregorianCalendar();
-						cal.setTimeInMillis(retractTime.getTime());
-						nAllPurpose.setRetractDate(cal.getTime());
-					}
-					else
-					{
-						nAllPurpose.setRetractDate(null);
-					}
-					nAllPurpose.setAttachmentSet(getAssignmentSupplementItemAttachment(state, nAllPurpose, ALLPURPOSE_ATTACHMENTS));
-					
-					// clean the access list first
-					m_assignmentSupplementItemService.cleanAllPurposeItemAccess(nAllPurpose);
-					Set<AssignmentAllPurposeItemAccess> accessSet = new HashSet<AssignmentAllPurposeItemAccess>();
-					try
-					{
-						AuthzGroup realm = AuthzGroupService.getAuthzGroup(SiteService.siteReference(siteId));
-						Set<Role> roles = realm.getRoles();
-						for(Iterator iRoles = roles.iterator(); iRoles.hasNext();)
+						// add the due date to schedule if the schedule exists
+						integrateWithCalendar(state, a, title, dueTime, checkAddDueTime, oldDueTime, aPropertiesEdit);
+	
+						// the open date been announced
+						integrateWithAnnouncement(state, aOldTitle, a, title, openTime, checkAutoAnnounce, oldOpenTime);
+	
+						// integrate with Gradebook
+						try
 						{
-							// iterator through roles first
-							Role r = (Role) iRoles.next();
-							if (params.getString("allPurpose_" + r.getId()) != null)
-							{
-								AssignmentAllPurposeItemAccess access = m_assignmentSupplementItemService.newAllPurposeItemAccess();
-								access.setAccess(r.getId());
-								access.setAssignmentAllPurposeItem(nAllPurpose);
-								m_assignmentSupplementItemService.saveAllPurposeItemAccess(access);
-								accessSet.add(access);
-							}
-							else
-							{
-								// if the role is not selected, iterate through the users with this role
-								Set userIds = realm.getUsersHasRole(r.getId());
-								for(Iterator iUserIds = userIds.iterator(); iUserIds.hasNext();)
-								{
-									String userId = (String) iUserIds.next();
-									if (params.getString("allPurpose_" + userId) != null)
-									{
-										AssignmentAllPurposeItemAccess access = m_assignmentSupplementItemService.newAllPurposeItemAccess();
-										access.setAccess(userId);
-										access.setAssignmentAllPurposeItem(nAllPurpose);
-										m_assignmentSupplementItemService.saveAllPurposeItemAccess(access);
-										accessSet.add(access);
-									}
-								}
-							}
+							initIntegrateWithGradebook(state, siteId, aOldTitle, oAssociateGradebookAssignment, a, title, dueTime, gradeType, gradePoints, addtoGradebook, associateGradebookAssignment, range);
+						}
+						catch (AssignmentHasIllegalPointsException e)
+						{
+							addAlert(state, rb.getString("addtogradebook.illegalPoints"));
+							M_log.warn(this + ":post_save_assignment " + e.getMessage());
 						}
 					}
-					catch (Exception e)
-					{
-						M_log.warn(this + ":postOrSaveAssignment " + e.toString() + "error finding authzGroup for = " + siteId);
-					}
-					nAllPurpose.setAccessSet(accessSet);
-					m_assignmentSupplementItemService.saveAllPurposeItem(nAllPurpose);
 				}
 
 			} // if
 
 		} // if
 		
-		// set default sorting
-		setDefaultSort(state);
-		
-		if (state.getAttribute(STATE_MESSAGE) == null)
+	} // post_save_assignment
+
+	/**
+	 * supplement item related information
+	 * @param state
+	 * @param params
+	 * @param siteId
+	 * @param a
+	 */
+	private void saveAssignmentSupplementItem(SessionState state,
+			ParameterParser params, String siteId, AssignmentEdit a) {
+		// assignment supplement items
+		String aId = a.getId();
+		//model answer
+		if (state.getAttribute(MODELANSWER_TO_DELETE) != null && "true".equals((String) state.getAttribute(MODELANSWER_TO_DELETE)))
 		{
-			state.setAttribute(STATE_MODE, MODE_LIST_ASSIGNMENTS);
-			state.setAttribute(ATTACHMENTS, EntityManager.newReferenceList());
-			resetAssignment(state);
+			// to delete the model answer
+			AssignmentModelAnswerItem mAnswer = m_assignmentSupplementItemService.getModelAnswer(aId);
+			if (mAnswer != null)
+				m_assignmentSupplementItemService.removeModelAnswer(mAnswer);
 		}
-		
-	} // postOrSaveAssignment
+		else if (state.getAttribute(MODELANSWER_TEXT) != null)
+		{
+			// edit/add model answer
+			AssignmentModelAnswerItem mAnswer = m_assignmentSupplementItemService.getModelAnswer(aId);
+			if (mAnswer == null)
+			{
+				mAnswer = m_assignmentSupplementItemService.newModelAnswer();
+				m_assignmentSupplementItemService.saveModelAnswer(mAnswer);
+			}
+			mAnswer.setAssignmentId(a.getId());
+			mAnswer.setText((String) state.getAttribute(MODELANSWER_TEXT));
+			mAnswer.setShowTo(state.getAttribute(MODELANSWER_SHOWTO) != null ? Integer.parseInt((String) state.getAttribute(MODELANSWER_SHOWTO)) : 0);
+			mAnswer.setAttachmentSet(getAssignmentSupplementItemAttachment(state, mAnswer, MODELANSWER_ATTACHMENTS));
+			m_assignmentSupplementItemService.saveModelAnswer(mAnswer);
+		}
+		// note
+		if (state.getAttribute(NOTE_TO_DELETE) != null &&  "true".equals((String) state.getAttribute(NOTE_TO_DELETE)))
+		{
+			// to remove note item
+			AssignmentNoteItem nNote = m_assignmentSupplementItemService.getNoteItem(aId);
+			if (nNote != null)
+				m_assignmentSupplementItemService.removeNoteItem(nNote);
+		}
+		else if (state.getAttribute(NOTE_TEXT) != null)
+		{
+			// edit/add private note
+			AssignmentNoteItem nNote = m_assignmentSupplementItemService.getNoteItem(aId);
+			if (nNote == null)
+				nNote = m_assignmentSupplementItemService.newNoteItem();
+			nNote.setAssignmentId(a.getId());
+			nNote.setNote((String) state.getAttribute(NOTE_TEXT));
+			nNote.setShareWith(state.getAttribute(NOTE_SHAREWITH) != null ? Integer.parseInt((String) state.getAttribute(NOTE_SHAREWITH)) : 0);
+			nNote.setCreatorId(UserDirectoryService.getCurrentUser().getId());
+			m_assignmentSupplementItemService.saveNoteItem(nNote);
+		}
+		// all purpose
+		if (state.getAttribute(ALLPURPOSE_TO_DELETE) != null && "true".equals((String) state.getAttribute(ALLPURPOSE_TO_DELETE)))
+		{
+			// to remove allPurpose item
+			AssignmentAllPurposeItem nAllPurpose = m_assignmentSupplementItemService.getAllPurposeItem(aId);
+			if (nAllPurpose != null)
+				m_assignmentSupplementItemService.removeAllPurposeItem(nAllPurpose);
+		}
+		else if (state.getAttribute(ALLPURPOSE_TITLE) != null)
+		{
+			// edit/add private note
+			AssignmentAllPurposeItem nAllPurpose = m_assignmentSupplementItemService.getAllPurposeItem(aId);
+			if (nAllPurpose == null)
+			{
+				nAllPurpose = m_assignmentSupplementItemService.newAllPurposeItem();
+				m_assignmentSupplementItemService.saveAllPurposeItem(nAllPurpose);
+			}
+			nAllPurpose.setAssignmentId(a.getId());
+			nAllPurpose.setTitle((String) state.getAttribute(ALLPURPOSE_TITLE));
+			nAllPurpose.setText((String) state.getAttribute(ALLPURPOSE_TEXT));
+			
+			boolean allPurposeShowFrom = state.getAttribute(ALLPURPOSE_SHOW_FROM) != null ? ((Boolean) state.getAttribute(ALLPURPOSE_SHOW_FROM)).booleanValue() : false;
+			boolean allPurposeShowTo = state.getAttribute(ALLPURPOSE_SHOW_TO) != null ? ((Boolean) state.getAttribute(ALLPURPOSE_SHOW_TO)).booleanValue() : false;
+			boolean allPurposeHide = state.getAttribute(ALLPURPOSE_HIDE) != null ? ((Boolean) state.getAttribute(ALLPURPOSE_HIDE)).booleanValue() : false;
+			nAllPurpose.setHide(allPurposeHide);
+			// save the release and retract dates
+			if (allPurposeShowFrom && !allPurposeHide)
+			{
+				// save release date
+				Time releaseTime = getTimeFromState(state, ALLPURPOSE_RELEASE_MONTH, ALLPURPOSE_RELEASE_DAY, ALLPURPOSE_RELEASE_YEAR, ALLPURPOSE_RELEASE_HOUR, ALLPURPOSE_RELEASE_MIN, ALLPURPOSE_RELEASE_AMPM);
+				GregorianCalendar cal = new GregorianCalendar();
+				cal.setTimeInMillis(releaseTime.getTime());
+				nAllPurpose.setReleaseDate(cal.getTime());
+			}
+			else
+			{
+				nAllPurpose.setReleaseDate(null);
+			}
+			if (allPurposeShowTo && !allPurposeHide)
+			{
+				// save retract date
+				Time retractTime = getTimeFromState(state, ALLPURPOSE_RETRACT_MONTH, ALLPURPOSE_RETRACT_DAY, ALLPURPOSE_RETRACT_YEAR, ALLPURPOSE_RETRACT_HOUR, ALLPURPOSE_RETRACT_MIN, ALLPURPOSE_RETRACT_AMPM);
+				GregorianCalendar cal = new GregorianCalendar();
+				cal.setTimeInMillis(retractTime.getTime());
+				nAllPurpose.setRetractDate(cal.getTime());
+			}
+			else
+			{
+				nAllPurpose.setRetractDate(null);
+			}
+			nAllPurpose.setAttachmentSet(getAssignmentSupplementItemAttachment(state, nAllPurpose, ALLPURPOSE_ATTACHMENTS));
+			
+			// clean the access list first
+			if (state.getAttribute(ALLPURPOSE_ACCESS) != null)
+			{
+				// get the access settings
+				List<String> accessList = (List<String>) state.getAttribute(ALLPURPOSE_ACCESS);
+				
+				m_assignmentSupplementItemService.cleanAllPurposeItemAccess(nAllPurpose);
+				Set<AssignmentAllPurposeItemAccess> accessSet = new HashSet<AssignmentAllPurposeItemAccess>();
+				try
+				{
+					AuthzGroup realm = AuthzGroupService.getAuthzGroup(SiteService.siteReference(siteId));
+					Set<Role> roles = realm.getRoles();
+					for(Iterator iRoles = roles.iterator(); iRoles.hasNext();)
+					{
+						// iterator through roles first
+						Role r = (Role) iRoles.next();
+						if (accessList.contains(r.getId()))
+						{
+							AssignmentAllPurposeItemAccess access = m_assignmentSupplementItemService.newAllPurposeItemAccess();
+							access.setAccess(r.getId());
+							access.setAssignmentAllPurposeItem(nAllPurpose);
+							m_assignmentSupplementItemService.saveAllPurposeItemAccess(access);
+							accessSet.add(access);
+						}
+						else
+						{
+							// if the role is not selected, iterate through the users with this role
+							Set userIds = realm.getUsersHasRole(r.getId());
+							for(Iterator iUserIds = userIds.iterator(); iUserIds.hasNext();)
+							{
+								String userId = (String) iUserIds.next();
+								if (accessList.contains(userId))
+								{
+									AssignmentAllPurposeItemAccess access = m_assignmentSupplementItemService.newAllPurposeItemAccess();
+									access.setAccess(userId);
+									access.setAssignmentAllPurposeItem(nAllPurpose);
+									m_assignmentSupplementItemService.saveAllPurposeItemAccess(access);
+									accessSet.add(access);
+								}
+							}
+						}
+					}
+				}
+				catch (Exception e)
+				{
+					M_log.warn(this + ":post_save_assignment " + e.toString() + "error finding authzGroup for = " + siteId);
+				}
+				nAllPurpose.setAccessSet(accessSet);
+			}
+			m_assignmentSupplementItemService.saveAllPurposeItem(nAllPurpose);
+		}
+	}
 
 
 	private Set<AssignmentSupplementItemAttachment> getAssignmentSupplementItemAttachment(SessionState state, AssignmentSupplementItemWithAttachment mItem, String attachmentString) {
@@ -5795,7 +5994,7 @@ public class AssignmentAction extends PagedResourceActionII
 		}
 	}
 
-	private void commitAssignmentContentEdit(SessionState state, AssignmentContentEdit ac, String title, int submissionType,boolean useReviewService, boolean allowStudentViewReport, int gradeType, String gradePoints, String description, String checkAddHonorPledge, List attachments1) 
+	private void commitAssignmentContentEdit(SessionState state, AssignmentContentEdit ac, String title, int submissionType,boolean useReviewService, boolean allowStudentViewReport, int gradeType, String gradePoints, String description, String checkAddHonorPledge, List attachments) 
 	{
 		ac.setTitle(title);
 		ac.setInstructions(description);
@@ -5831,12 +6030,15 @@ public class AssignmentAction extends PagedResourceActionII
 		// clear attachments
 		ac.clearAttachments();
 
-		// add each attachment
-		Iterator it = EntityManager.newReferenceList(attachments1).iterator();
-		while (it.hasNext())
+		if (attachments != null)
 		{
-			Reference r = (Reference) it.next();
-			ac.addAttachment(r);
+			// add each attachment
+			Iterator it = EntityManager.newReferenceList(attachments).iterator();
+			while (it.hasNext())
+			{
+				Reference r = (Reference) it.next();
+				ac.addAttachment(r);
+			}
 		}
 		state.setAttribute(ATTACHMENTS_MODIFIED, new Boolean(false));
 
@@ -5876,7 +6078,7 @@ public class AssignmentAction extends PagedResourceActionII
         }
         
         // clear the permission
-        SecurityService.clearAdvisors();
+        SecurityService.popAdvisor();
 		
 		if (state.getAttribute(STATE_MESSAGE) == null)
 		{
@@ -6017,7 +6219,7 @@ public class AssignmentAction extends PagedResourceActionII
 	 */
 	public void doSave_assignment(RunData data)
 	{
-		postOrSaveAssignment(data, "save");
+		post_save_assignment(data, "save");
 
 	} // doSave_assignment
 	
@@ -6036,7 +6238,7 @@ public class AssignmentAction extends PagedResourceActionII
 	{
 		SessionState state = ((JetspeedRunData) data).getPortletSessionState(((JetspeedRunData) data).getJs_peid());
 
-		setNewAssignmentParameters(data, false);
+		setNewAssignmentParameters(data, true);
 
 		String assignmentId = data.getParameters().getString("assignmentId");
 		state.setAttribute(PREVIEW_ASSIGNMENT_ASSIGNMENT_ID, assignmentId);
@@ -6121,151 +6323,158 @@ public class AssignmentAction extends PagedResourceActionII
 		ParameterParser params = data.getParameters();
 
 		String assignmentId = StringUtil.trimToNull(params.getString("assignmentId"));
-		// whether the user can modify the assignment
-		state.setAttribute(EDIT_ASSIGNMENT_ID, assignmentId);
-
-		try
+		if (AssignmentService.allowUpdateAssignment(assignmentId))
 		{
-			Assignment a = AssignmentService.getAssignment(assignmentId);
-			// for the non_electronice assignment, submissions are auto-generated by the time that assignment is created;
-			// don't need to go through the following checkings.
-			if (a.getContent().getTypeOfSubmission() != Assignment.NON_ELECTRONIC_ASSIGNMENT_SUBMISSION)
+			// whether the user can modify the assignment
+			state.setAttribute(EDIT_ASSIGNMENT_ID, assignmentId);
+	
+			try
 			{
-				Iterator submissions = AssignmentService.getSubmissions(a).iterator();
-				if (submissions.hasNext())
+				Assignment a = AssignmentService.getAssignment(assignmentId);
+				// for the non_electronice assignment, submissions are auto-generated by the time that assignment is created;
+				// don't need to go through the following checkings.
+				if (a.getContent().getTypeOfSubmission() != Assignment.NON_ELECTRONIC_ASSIGNMENT_SUBMISSION)
 				{
-					// any submitted?
-					boolean anySubmitted = false;
-					for (;submissions.hasNext() && !anySubmitted;)
+					Iterator submissions = AssignmentService.getSubmissions(a).iterator();
+					if (submissions.hasNext())
 					{
-						AssignmentSubmission s = (AssignmentSubmission) submissions.next();
-						if (s.getSubmitted() && s.getTimeSubmitted() != null)
+						// any submitted?
+						boolean anySubmitted = false;
+						for (;submissions.hasNext() && !anySubmitted;)
 						{
-							anySubmitted = true;
+							AssignmentSubmission s = (AssignmentSubmission) submissions.next();
+							if (s.getSubmitted() && s.getTimeSubmitted() != null)
+							{
+								anySubmitted = true;
+							}
 						}
-					}
-					
-					// any draft submission
-					boolean anyDraft = false;
-					for (;submissions.hasNext() && !anyDraft;)
-					{
-						AssignmentSubmission s = (AssignmentSubmission) submissions.next();
-						if (!s.getSubmitted())
+						
+						// any draft submission
+						boolean anyDraft = false;
+						for (;submissions.hasNext() && !anyDraft;)
 						{
-							anyDraft = true;
+							AssignmentSubmission s = (AssignmentSubmission) submissions.next();
+							if (!s.getSubmitted())
+							{
+								anyDraft = true;
+							}
 						}
-					}
-					if (anySubmitted)
-					{
-						// if there is any submitted submission to this assignment, show alert
-						addAlert(state, rb.getString("assig1") + " " + a.getTitle() + " " + rb.getString("hassum"));
-					}
-					
-					if (anyDraft)
-					{
-						// otherwise, show alert about someone has started working on the assignment, not necessarily submitted
-						addAlert(state, rb.getString("hasDraftSum"));
+						if (anySubmitted)
+						{
+							// if there is any submitted submission to this assignment, show alert
+							addAlert(state, rb.getString("assig1") + " " + a.getTitle() + " " + rb.getString("hassum"));
+						}
+						
+						if (anyDraft)
+						{
+							// otherwise, show alert about someone has started working on the assignment, not necessarily submitted
+							addAlert(state, rb.getString("hasDraftSum"));
+						}
 					}
 				}
-			}
-
-			// SECTION MOD
-			state.setAttribute(STATE_SECTION_STRING, a.getSection());
-
-			// put the names and values into vm file
-			state.setAttribute(NEW_ASSIGNMENT_TITLE, a.getTitle());
-			state.setAttribute(NEW_ASSIGNMENT_ORDER, a.getPosition_order());
+	
+				// SECTION MOD
+				state.setAttribute(STATE_SECTION_STRING, a.getSection());
+	
+				// put the names and values into vm file
+				state.setAttribute(NEW_ASSIGNMENT_TITLE, a.getTitle());
+				state.setAttribute(NEW_ASSIGNMENT_ORDER, a.getPosition_order());
+				
+				putTimePropertiesInState(state, a.getOpenTime(), NEW_ASSIGNMENT_OPENMONTH, NEW_ASSIGNMENT_OPENDAY, NEW_ASSIGNMENT_OPENYEAR, NEW_ASSIGNMENT_OPENHOUR, NEW_ASSIGNMENT_OPENMIN, NEW_ASSIGNMENT_OPENAMPM);
+	
+				putTimePropertiesInState(state, a.getDueTime(), NEW_ASSIGNMENT_DUEMONTH, NEW_ASSIGNMENT_DUEDAY, NEW_ASSIGNMENT_DUEYEAR, NEW_ASSIGNMENT_DUEHOUR, NEW_ASSIGNMENT_DUEMIN, NEW_ASSIGNMENT_DUEAMPM);
+				// generate alert when editing an assignment past due date
+				if (a.getDueTime().before(TimeService.newTime()))
+				{
+					addAlert(state, rb.getString("youarenot17"));
+				}
+	
+				if (a.getCloseTime() != null)
+				{
+					state.setAttribute(NEW_ASSIGNMENT_ENABLECLOSEDATE, new Boolean(true));
+					putTimePropertiesInState(state, a.getCloseTime(), NEW_ASSIGNMENT_CLOSEMONTH, NEW_ASSIGNMENT_CLOSEDAY, NEW_ASSIGNMENT_CLOSEYEAR, NEW_ASSIGNMENT_CLOSEHOUR, NEW_ASSIGNMENT_CLOSEMIN, NEW_ASSIGNMENT_CLOSEAMPM);
+				}
+				else
+				{
+					state.setAttribute(NEW_ASSIGNMENT_ENABLECLOSEDATE, new Boolean(false));
+					state.setAttribute(NEW_ASSIGNMENT_CLOSEMONTH, state.getAttribute(NEW_ASSIGNMENT_DUEMONTH));
+					state.setAttribute(NEW_ASSIGNMENT_CLOSEDAY, state.getAttribute(NEW_ASSIGNMENT_DUEDAY));
+					state.setAttribute(NEW_ASSIGNMENT_CLOSEYEAR, state.getAttribute(NEW_ASSIGNMENT_DUEYEAR));
+					state.setAttribute(NEW_ASSIGNMENT_CLOSEHOUR, state.getAttribute(NEW_ASSIGNMENT_DUEHOUR));
+					state.setAttribute(NEW_ASSIGNMENT_CLOSEMIN, state.getAttribute(NEW_ASSIGNMENT_DUEMIN));
+					state.setAttribute(NEW_ASSIGNMENT_CLOSEAMPM, state.getAttribute(NEW_ASSIGNMENT_DUEAMPM));
+				}
+				state.setAttribute(NEW_ASSIGNMENT_SECTION, a.getSection());
+	
+				state.setAttribute(NEW_ASSIGNMENT_SUBMISSION_TYPE, new Integer(a.getContent().getTypeOfSubmission()));
+				int typeOfGrade = a.getContent().getTypeOfGrade();
+				state.setAttribute(NEW_ASSIGNMENT_GRADE_TYPE, new Integer(typeOfGrade));
+				if (typeOfGrade == 3)
+				{
+					state.setAttribute(NEW_ASSIGNMENT_GRADE_POINTS, a.getContent().getMaxGradePointDisplay());
+				}
+				state.setAttribute(NEW_ASSIGNMENT_DESCRIPTION, a.getContent().getInstructions());
+				
+				ResourceProperties properties = a.getProperties();
+				state.setAttribute(ResourceProperties.NEW_ASSIGNMENT_CHECK_ADD_DUE_DATE, properties.getProperty(
+						ResourceProperties.NEW_ASSIGNMENT_CHECK_ADD_DUE_DATE));
+				state.setAttribute(ResourceProperties.NEW_ASSIGNMENT_CHECK_AUTO_ANNOUNCE, properties.getProperty(
+						ResourceProperties.NEW_ASSIGNMENT_CHECK_AUTO_ANNOUNCE));
+				state.setAttribute(NEW_ASSIGNMENT_CHECK_ADD_HONOR_PLEDGE, Integer.toString(a.getContent().getHonorPledge()));
+				
+				state.setAttribute(AssignmentService.NEW_ASSIGNMENT_ADD_TO_GRADEBOOK, properties.getProperty(AssignmentService.NEW_ASSIGNMENT_ADD_TO_GRADEBOOK));
+				state.setAttribute(AssignmentService.PROP_ASSIGNMENT_ASSOCIATE_GRADEBOOK_ASSIGNMENT, properties.getProperty(AssignmentService.PROP_ASSIGNMENT_ASSOCIATE_GRADEBOOK_ASSIGNMENT));
+				
+				state.setAttribute(ATTACHMENTS, a.getContent().getAttachments());
+				
+				// notification option
+				if (properties.getProperty(Assignment.ASSIGNMENT_INSTRUCTOR_NOTIFICATIONS_VALUE) != null)
+				{
+					state.setAttribute(Assignment.ASSIGNMENT_INSTRUCTOR_NOTIFICATIONS_VALUE, properties.getProperty(Assignment.ASSIGNMENT_INSTRUCTOR_NOTIFICATIONS_VALUE));
+				}
+	
+				// group setting
+				if (a.getAccess().equals(Assignment.AssignmentAccess.SITE))
+				{
+					state.setAttribute(NEW_ASSIGNMENT_RANGE, "site");
+				}
+				else
+				{
+					state.setAttribute(NEW_ASSIGNMENT_RANGE, "groups");
+				}
+				
+				// put the resubmission option into state
+				assignment_resubmission_option_into_state(a, null, state);
+				
+				// set whether we use the review service or not
+				state.setAttribute(NEW_ASSIGNMENT_USE_REVIEW_SERVICE, new Boolean(a.getContent().getAllowReviewService()).toString());
+				
+				//set whether students can view the review service results
+				state.setAttribute(NEW_ASSIGNMENT_ALLOW_STUDENT_VIEW, new Boolean(a.getContent().getAllowStudentViewReport()).toString());
+				
+				state.setAttribute(NEW_ASSIGNMENT_GROUPS, a.getGroups());
+				
+				// get all supplement item info into state
+				setAssignmentSupplementItemInState(state, a);
 			
-			putTimePropertiesInState(state, a.getOpenTime(), NEW_ASSIGNMENT_OPENMONTH, NEW_ASSIGNMENT_OPENDAY, NEW_ASSIGNMENT_OPENYEAR, NEW_ASSIGNMENT_OPENHOUR, NEW_ASSIGNMENT_OPENMIN, NEW_ASSIGNMENT_OPENAMPM);
-
-			putTimePropertiesInState(state, a.getDueTime(), NEW_ASSIGNMENT_DUEMONTH, NEW_ASSIGNMENT_DUEDAY, NEW_ASSIGNMENT_DUEYEAR, NEW_ASSIGNMENT_DUEHOUR, NEW_ASSIGNMENT_DUEMIN, NEW_ASSIGNMENT_DUEAMPM);
-			// generate alert when editing an assignment past due date
-			if (a.getDueTime().before(TimeService.newTime()))
+			}
+			catch (IdUnusedException e)
 			{
-				addAlert(state, rb.getString("youarenot17"));
+				addAlert(state, rb.getString("cannotfin3"));
+				M_log.warn(this + ":getEditAssignment " + e.getMessage());
 			}
-
-			if (a.getCloseTime() != null)
+			catch (PermissionException e)
 			{
-				state.setAttribute(NEW_ASSIGNMENT_ENABLECLOSEDATE, new Boolean(true));
-				putTimePropertiesInState(state, a.getCloseTime(), NEW_ASSIGNMENT_CLOSEMONTH, NEW_ASSIGNMENT_CLOSEDAY, NEW_ASSIGNMENT_CLOSEYEAR, NEW_ASSIGNMENT_CLOSEHOUR, NEW_ASSIGNMENT_CLOSEMIN, NEW_ASSIGNMENT_CLOSEAMPM);
+				addAlert(state, rb.getString("youarenot14"));
+				M_log.warn(this + ":getEditAssignment " + e.getMessage());
 			}
-			else
-			{
-				state.setAttribute(NEW_ASSIGNMENT_ENABLECLOSEDATE, new Boolean(false));
-				state.setAttribute(NEW_ASSIGNMENT_CLOSEMONTH, state.getAttribute(NEW_ASSIGNMENT_DUEMONTH));
-				state.setAttribute(NEW_ASSIGNMENT_CLOSEDAY, state.getAttribute(NEW_ASSIGNMENT_DUEDAY));
-				state.setAttribute(NEW_ASSIGNMENT_CLOSEYEAR, state.getAttribute(NEW_ASSIGNMENT_DUEYEAR));
-				state.setAttribute(NEW_ASSIGNMENT_CLOSEHOUR, state.getAttribute(NEW_ASSIGNMENT_DUEHOUR));
-				state.setAttribute(NEW_ASSIGNMENT_CLOSEMIN, state.getAttribute(NEW_ASSIGNMENT_DUEMIN));
-				state.setAttribute(NEW_ASSIGNMENT_CLOSEAMPM, state.getAttribute(NEW_ASSIGNMENT_DUEAMPM));
-			}
-			state.setAttribute(NEW_ASSIGNMENT_SECTION, a.getSection());
-
-			state.setAttribute(NEW_ASSIGNMENT_SUBMISSION_TYPE, new Integer(a.getContent().getTypeOfSubmission()));
-			int typeOfGrade = a.getContent().getTypeOfGrade();
-			state.setAttribute(NEW_ASSIGNMENT_GRADE_TYPE, new Integer(typeOfGrade));
-			if (typeOfGrade == 3)
-			{
-				state.setAttribute(NEW_ASSIGNMENT_GRADE_POINTS, a.getContent().getMaxGradePointDisplay());
-			}
-			state.setAttribute(NEW_ASSIGNMENT_DESCRIPTION, a.getContent().getInstructions());
-			
-			ResourceProperties properties = a.getProperties();
-			state.setAttribute(ResourceProperties.NEW_ASSIGNMENT_CHECK_ADD_DUE_DATE, properties.getProperty(
-					ResourceProperties.NEW_ASSIGNMENT_CHECK_ADD_DUE_DATE));
-			state.setAttribute(ResourceProperties.NEW_ASSIGNMENT_CHECK_AUTO_ANNOUNCE, properties.getProperty(
-					ResourceProperties.NEW_ASSIGNMENT_CHECK_AUTO_ANNOUNCE));
-			state.setAttribute(NEW_ASSIGNMENT_CHECK_ADD_HONOR_PLEDGE, Integer.toString(a.getContent().getHonorPledge()));
-			
-			state.setAttribute(AssignmentService.NEW_ASSIGNMENT_ADD_TO_GRADEBOOK, properties.getProperty(AssignmentService.NEW_ASSIGNMENT_ADD_TO_GRADEBOOK));
-			state.setAttribute(AssignmentService.PROP_ASSIGNMENT_ASSOCIATE_GRADEBOOK_ASSIGNMENT, properties.getProperty(AssignmentService.PROP_ASSIGNMENT_ASSOCIATE_GRADEBOOK_ASSIGNMENT));
-			
-			state.setAttribute(ATTACHMENTS, a.getContent().getAttachments());
-			
-			// notification option
-			if (properties.getProperty(Assignment.ASSIGNMENT_INSTRUCTOR_NOTIFICATIONS_VALUE) != null)
-			{
-				state.setAttribute(Assignment.ASSIGNMENT_INSTRUCTOR_NOTIFICATIONS_VALUE, properties.getProperty(Assignment.ASSIGNMENT_INSTRUCTOR_NOTIFICATIONS_VALUE));
-			}
-
-			// group setting
-			if (a.getAccess().equals(Assignment.AssignmentAccess.SITE))
-			{
-				state.setAttribute(NEW_ASSIGNMENT_RANGE, "site");
-			}
-			else
-			{
-				state.setAttribute(NEW_ASSIGNMENT_RANGE, "groups");
-			}
-			
-			// put the resubmission option into state
-			assignment_resubmission_option_into_state(a, null, state);
-			
-			// set whether we use the review service or not
-			state.setAttribute(NEW_ASSIGNMENT_USE_REVIEW_SERVICE, new Boolean(a.getContent().getAllowReviewService()).toString());
-			
-			//set whether students can view the review service results
-			state.setAttribute(NEW_ASSIGNMENT_ALLOW_STUDENT_VIEW, new Boolean(a.getContent().getAllowStudentViewReport()).toString());
-			
-			state.setAttribute(NEW_ASSIGNMENT_GROUPS, a.getGroups());
-			
-			// get all supplement item info into state
-			setAssignmentSupplementItemInState(state, a);
-		
+	
+			state.setAttribute(STATE_MODE, MODE_INSTRUCTOR_NEW_EDIT_ASSIGNMENT);
 		}
-		catch (IdUnusedException e)
+		else
 		{
-			addAlert(state, rb.getString("cannotfin3"));
-			M_log.warn(this + ":getEditAssignment " + e.getMessage());
+			addAlert(state, rb.getString("youarenot6"));
 		}
-		catch (PermissionException e)
-		{
-			addAlert(state, rb.getString("youarenot14"));
-			M_log.warn(this + ":getEditAssignment " + e.getMessage());
-		}
-
-		state.setAttribute(STATE_MODE, MODE_INSTRUCTOR_NEW_EDIT_ASSIGNMENT);
 
 	} // doEdit_Assignment
 
@@ -6839,6 +7048,7 @@ public class AssignmentAction extends PagedResourceActionII
 				{
 					v.add(attachments.next());
 				}
+				state.setAttribute(GRADE_SUBMISSION_FEEDBACK_ATTACHMENT,v);
 				state.setAttribute(ATTACHMENTS, v);
 	
 				state.setAttribute(GRADE_SUBMISSION_GRADE, s.getGrade());
@@ -7038,6 +7248,32 @@ public class AssignmentAction extends PagedResourceActionII
 
 	} // doView_students_Assignment
 
+ 	/**
+	 * test whether one can access the state submission object
+	 * @param state
+	 * @return
+	 */
+	private AssignmentSubmission getStateSubmissionObject(SessionState state) {
+		AssignmentSubmission submission = null;
+		try
+		{
+			submission = AssignmentService.getSubmission((String) state.getAttribute(VIEW_GRADE_SUBMISSION_ID));
+		}
+		catch (IdUnusedException e)
+		{
+			M_log.warn(this + ":getStateSubmissionObject " + e.getMessage());
+			addAlert(state, rb.getString("cannotfin5"));
+		}
+		catch (PermissionException e)
+		{
+			M_log.warn(this + ":getStateSubmissionObject " + e.getMessage());
+			addAlert(state, rb.getString("not_allowed_to_get_submission"));
+		}
+		return submission;
+	}
+
+
+
 	/**
 	 * Action is to show the student submissions
 	 */
@@ -7082,8 +7318,12 @@ public class AssignmentAction extends PagedResourceActionII
 		ParameterParser params = data.getParameters();
 
 		state.setAttribute(VIEW_GRADE_SUBMISSION_ID, params.getString("submissionId"));
-
-		state.setAttribute(STATE_MODE, MODE_STUDENT_VIEW_GRADE);
+		
+		// whether the user can access the Submission object
+		if (getStateSubmissionObject(state) != null)
+		{
+			state.setAttribute(STATE_MODE, MODE_STUDENT_VIEW_GRADE);
+		}
 
 	} // doView_grade
 
@@ -7242,17 +7482,22 @@ public class AssignmentAction extends PagedResourceActionII
 			else if (option.equals("prevsubmission"))
 			{
 				// save and navigate to previous submission
-				doPrev_submission(data);
+				doPrev_back_next_submission(data, "prev");
 			}
 			else if (option.equals("nextsubmission"))
 			{
 				// save and navigate to previous submission
-				doNext_submission(data);
+				doPrev_back_next_submission(data, "next");
 			}
 			else if (option.equals("cancelgradesubmission"))
 			{
 				// back to the list view
-				doBack_to_submission_list(data);
+				doPrev_back_next_submission(data, "back");
+			}
+			else if (option.equals("reorderNavigation"))
+			{
+				// save and do reorder
+				doReorder(data);
 			}
 
 
@@ -7370,7 +7615,7 @@ public class AssignmentAction extends PagedResourceActionII
 		ParameterParser params = data.getParameters();
 
 		String mode = (String) state.getAttribute(STATE_MODE);
-		if (mode.equals(MODE_STUDENT_VIEW_SUBMISSION))
+		if (MODE_STUDENT_VIEW_SUBMISSION.equals(mode))
 		{
 			// retrieve the submission text (as formatted text)
 			boolean checkForFormattingErrors = true; // the student is submitting something - so check for errors
@@ -7405,11 +7650,11 @@ public class AssignmentAction extends PagedResourceActionII
 			// User[] users = { UserDirectoryService.getCurrentUser() };
 			// state.setAttribute(ResourcesAction.STATE_SAVE_ATTACHMENT_IN_DROPBOX, users);
 		}
-		else if (mode.equals(MODE_INSTRUCTOR_NEW_EDIT_ASSIGNMENT))
+		else if (MODE_INSTRUCTOR_NEW_EDIT_ASSIGNMENT.equals(mode))
 		{
 			setNewAssignmentParameters(data, false);
 		}
-		else if (mode.equals(MODE_INSTRUCTOR_GRADE_SUBMISSION))
+		else if (MODE_INSTRUCTOR_GRADE_SUBMISSION.equals(mode))
 		{
 			readGradeForm(data, state, "read");
 		}
@@ -7428,117 +7673,24 @@ public class AssignmentAction extends PagedResourceActionII
 	}
 
 	/**
-	 * readGradeForm
+	 * read grade information form and see if any grading information has been changed
+	 * @param data
+	 * @param state
+	 * @param gradeOption
+	 * @return
 	 */
-	public void readGradeForm(RunData data, SessionState state, String gradeOption)
-	{
-
+	public boolean readGradeForm(RunData data, SessionState state, String gradeOption)
+	{	
+		// whether user has changed anything from previous grading information
+		boolean hasChange = false;
+		
 		ParameterParser params = data.getParameters();
-		int typeOfGrade = -1;
+		String sId = params.getString("submissionId");
 		
-		String submissionId = params.getString("submissionId");
-
-		boolean withGrade = state.getAttribute(WITH_GRADES) != null ? ((Boolean) state.getAttribute(WITH_GRADES)).booleanValue()
-				: false;
-
-		boolean checkForFormattingErrors = false; // so that grading isn't held up by formatting errors
-		String feedbackComment = processFormattedTextFromBrowser(state, params.getCleanString(GRADE_SUBMISSION_FEEDBACK_COMMENT),
-				checkForFormattingErrors);
-		if (feedbackComment != null)
-		{
-			state.setAttribute(GRADE_SUBMISSION_FEEDBACK_COMMENT, feedbackComment);
-		}
-
-		String feedbackText = processAssignmentFeedbackFromBrowser(state, params.getCleanString(GRADE_SUBMISSION_FEEDBACK_TEXT));
-		if (feedbackText != null)
-		{
-			state.setAttribute(GRADE_SUBMISSION_FEEDBACK_TEXT, feedbackText);
-		}
-		
-		state.setAttribute(GRADE_SUBMISSION_FEEDBACK_ATTACHMENT, state.getAttribute(ATTACHMENTS));
-
-		String g = StringUtil.trimToNull(params.getCleanString(GRADE_SUBMISSION_GRADE));
-		if (g != null)
-		{
-			state.setAttribute(GRADE_SUBMISSION_GRADE, g);
-		}
-		else
-		{
-			state.removeAttribute(GRADE_SUBMISSION_GRADE);
-		}
-
-		String sId = (String) state.getAttribute(GRADE_SUBMISSION_SUBMISSION_ID);
-
+		AssignmentSubmission submission = null;
 		try
 		{
-			// for points grading, one have to enter number as the points
-			String grade = (String) state.getAttribute(GRADE_SUBMISSION_GRADE);
-
-			AssignmentSubmission submission = AssignmentService.getSubmission(sId);
-			Assignment a = submission.getAssignment();
-			typeOfGrade = a.getContent().getTypeOfGrade();
-
-			if (withGrade)
-			{
-				// do grade validation only for Assignment with Grade tool
-				if (typeOfGrade == Assignment.SCORE_GRADE_TYPE)
-				{
-					if ((grade != null))
-					{
-						// the preview grade process might already scaled up the grade by 10
-						if (!((String) state.getAttribute(STATE_MODE)).equals(MODE_INSTRUCTOR_PREVIEW_GRADE_SUBMISSION))
-						{
-							validPointGrade(state, grade);
-							
-							if (state.getAttribute(STATE_MESSAGE) == null)
-							{
-								int maxGrade = a.getContent().getMaxGradePoint();
-								try
-								{
-									if (Integer.parseInt(scalePointGrade(state, grade)) > maxGrade)
-									{
-										if (state.getAttribute(GRADE_GREATER_THAN_MAX_ALERT) == null)
-										{
-											// alert user first when he enters grade bigger than max scale
-											addAlert(state, rb.getString("grad2"));
-											state.setAttribute(GRADE_GREATER_THAN_MAX_ALERT, Boolean.TRUE);
-										}
-										else
-										{
-											// remove the alert once user confirms he wants to give student higher grade
-											state.removeAttribute(GRADE_GREATER_THAN_MAX_ALERT);
-										}
-									}
-								}
-								catch (NumberFormatException e)
-								{
-									alertInvalidPoint(state, grade);
-									M_log.warn(this + ":readGradeForm " + e.getMessage());
-								}
-							}
-							
-							state.setAttribute(GRADE_SUBMISSION_GRADE, grade);
-						}
-					}
-				}
-
-				// if ungraded and grade type is not "ungraded" type
-				if ((grade == null || grade.equals("ungraded")) && (typeOfGrade != Assignment.UNGRADED_GRADE_TYPE) && gradeOption.equals("release"))
-				{
-					addAlert(state, rb.getString("plespethe2"));
-				}
-			}
-			
-			// allow resubmit number and due time
-			if (params.getString("allowResToggle") != null && params.getString(AssignmentSubmission.ALLOW_RESUBMIT_NUMBER) != null)
-			{
-				// read in allowResubmit params 
-				readAllowResubmitParams(params, state, submission);
-			}
-			else
-			{
-				resetAllowResubmitParams(state);
-			}
+			submission = AssignmentService.getSubmission(sId);
 		}
 		catch (IdUnusedException e)
 		{
@@ -7551,12 +7703,178 @@ public class AssignmentAction extends PagedResourceActionII
 			M_log.warn(this + ":readGradeForm " + e.getMessage());
 		}
 		
-		if (state.getAttribute(STATE_MESSAGE) == null)
+		// security check for allowing grading submission or not
+		if (AssignmentService.allowGradeSubmission(sId))
 		{
-			String grade = (String) state.getAttribute(GRADE_SUBMISSION_GRADE);
-			grade = (typeOfGrade == Assignment.SCORE_GRADE_TYPE)?scalePointGrade(state, grade):grade;
-			state.setAttribute(GRADE_SUBMISSION_GRADE, grade);
+			int typeOfGrade = -1;
+			boolean withGrade = state.getAttribute(WITH_GRADES) != null ? ((Boolean) state.getAttribute(WITH_GRADES)).booleanValue()
+					: false;
+			
+			boolean checkForFormattingErrors = true; // so that grading isn't held up by formatting errors
+			String feedbackComment = processFormattedTextFromBrowser(state, params.getCleanString(GRADE_SUBMISSION_FEEDBACK_COMMENT),
+					checkForFormattingErrors);
+			// comment value changed?
+			hasChange = !hasChange && submission != null ? valueDiffFromStateAttribute(state, feedbackComment, submission.getFeedbackComment()):hasChange;
+			if (feedbackComment != null)
+			{
+				state.setAttribute(GRADE_SUBMISSION_FEEDBACK_COMMENT, feedbackComment);
+			}
+			
+
+			String feedbackText = processAssignmentFeedbackFromBrowser(state, params.getCleanString(GRADE_SUBMISSION_FEEDBACK_TEXT));
+			// feedbackText value changed?
+			hasChange = !hasChange && submission != null ? valueDiffFromStateAttribute(state, feedbackText, submission.getFeedbackText()):hasChange;
+			if (feedbackText != null)
+			{
+				state.setAttribute(GRADE_SUBMISSION_FEEDBACK_TEXT, feedbackText);
+			}
+			
+			// any change inside attachment list?
+			if (!hasChange && submission != null)
+			{
+				List stateAttachments = submission.getFeedbackAttachments();
+				List inputAttachments = (List) state.getAttribute(ATTACHMENTS);
+				
+				if (stateAttachments == null && inputAttachments != null
+					|| stateAttachments != null && inputAttachments == null	
+					|| stateAttachments != null && inputAttachments != null && !(stateAttachments.containsAll(inputAttachments) && inputAttachments.containsAll(stateAttachments)))
+				{
+					hasChange = true;
+				}
+			}
+			state.setAttribute(GRADE_SUBMISSION_FEEDBACK_ATTACHMENT, state.getAttribute(ATTACHMENTS));
+
+			String g = StringUtil.trimToNull(params.getCleanString(GRADE_SUBMISSION_GRADE));
+
+			if (submission != null)
+			{
+				Assignment a = submission.getAssignment();
+				typeOfGrade = a.getContent().getTypeOfGrade();
+	
+				if (withGrade)
+				{
+					// any change in grade. Do not check for ungraded assignment type
+					if (!hasChange && typeOfGrade != Assignment.UNGRADED_GRADE_TYPE)
+					{
+						if (typeOfGrade == Assignment.SCORE_GRADE_TYPE)
+						{
+							hasChange = valueDiffFromStateAttribute(state, scalePointGrade(state, g), submission.getGrade());
+						}
+						else 
+						{
+							hasChange = valueDiffFromStateAttribute(state, g, submission.getGrade());
+						}
+					}
+					if (g != null)
+					{
+						state.setAttribute(GRADE_SUBMISSION_GRADE, g);
+					}
+					else
+					{
+						state.removeAttribute(GRADE_SUBMISSION_GRADE);
+					}
+					
+					// for points grading, one have to enter number as the points
+					String grade = (String) state.getAttribute(GRADE_SUBMISSION_GRADE);
+					
+					// do grade validation only for Assignment with Grade tool
+					if (typeOfGrade == Assignment.SCORE_GRADE_TYPE)
+					{
+						if ((grade != null))
+						{
+							// the preview grade process might already scaled up the grade by 10
+							if (!((String) state.getAttribute(STATE_MODE)).equals(MODE_INSTRUCTOR_PREVIEW_GRADE_SUBMISSION))
+							{
+								validPointGrade(state, grade);
+								
+								if (state.getAttribute(STATE_MESSAGE) == null)
+								{
+									int maxGrade = a.getContent().getMaxGradePoint();
+									try
+									{
+										if (Integer.parseInt(scalePointGrade(state, grade)) > maxGrade)
+										{
+											if (state.getAttribute(GRADE_GREATER_THAN_MAX_ALERT) == null)
+											{
+												// alert user first when he enters grade bigger than max scale
+												addAlert(state, rb.getFormattedMessage("grad2", new Object[]{grade, displayGrade(state, String.valueOf(maxGrade))}));
+												state.setAttribute(GRADE_GREATER_THAN_MAX_ALERT, Boolean.TRUE);
+											}
+											else
+											{
+												// remove the alert once user confirms he wants to give student higher grade
+												state.removeAttribute(GRADE_GREATER_THAN_MAX_ALERT);
+											}
+										}
+									}
+									catch (NumberFormatException e)
+									{
+										alertInvalidPoint(state, grade);
+										M_log.warn(this + ":readGradeForm " + e.getMessage());
+									}
+								}
+								
+								state.setAttribute(GRADE_SUBMISSION_GRADE, grade);
+							}
+						}
+					}
+	
+					// if ungraded and grade type is not "ungraded" type
+					if ((grade == null || "ungraded".equals(grade)) && (typeOfGrade != Assignment.UNGRADED_GRADE_TYPE) && "release".equals(gradeOption))
+					{
+						addAlert(state, rb.getString("plespethe2"));
+					}
+				}
+				
+				// allow resubmit number and due time
+				if (params.getString("allowResToggle") != null && params.getString(AssignmentSubmission.ALLOW_RESUBMIT_NUMBER) != null)
+				{
+					// read in allowResubmit params 
+					readAllowResubmitParams(params, state, submission);
+				}
+				else
+				{
+					resetAllowResubmitParams(state);
+				}
+				// record whether the resubmission options has been changed or not
+				hasChange = hasChange || change_resubmit_option(state, submission);
+			}
+		
+			if (state.getAttribute(STATE_MESSAGE) == null)
+			{
+				String grade = (String) state.getAttribute(GRADE_SUBMISSION_GRADE);
+				grade = (typeOfGrade == Assignment.SCORE_GRADE_TYPE)?scalePointGrade(state, grade):grade;
+				state.setAttribute(GRADE_SUBMISSION_GRADE, grade);
+			}
 		}
+		else
+		{
+			// generate alert
+			addAlert(state, rb.getFormattedMessage("not_allowed_to_grade_submission", new Object[]{sId}));
+		}
+		
+		return hasChange;
+	}
+	
+	/**
+	 * whether the current input value is different from existing oldValue
+	 * @param state
+	 * @param value
+	 * @param oldValue
+	 * @return
+	 */
+	private boolean valueDiffFromStateAttribute(SessionState state, String value, String oldValue)
+	{
+		boolean rv = false;
+		value = StringUtils.trimToNull(value);
+		oldValue = StringUtils.trimToNull(oldValue);
+		if (oldValue == null && value != null 
+				|| oldValue != null && value == null
+				|| oldValue != null && value != null && !oldValue.equals(value))
+		{
+			rv = true;
+		}
+		return rv;
 	}
 	
 	/**
@@ -7702,17 +8020,17 @@ public class AssignmentAction extends PagedResourceActionII
 						catch (IdUnusedException e)
 						{
 							state.removeAttribute(CALENDAR);
-							M_log.warn(this + ":initState No calendar found for site " + siteId + e.getMessage());
+							M_log.info(this + ":initState No calendar found for site " + siteId  + " " + e.getMessage());
 						}
 						catch (PermissionException e)
 						{
 							state.removeAttribute(CALENDAR);
-							M_log.warn(this + ":initState No permission to get the calender. " + e.getMessage());
+							M_log.info(this + ":initState No permission to get the calender. " + e.getMessage());
 						}
 						catch (Exception ex)
 						{
 							state.removeAttribute(CALENDAR);
-							M_log.warn(this + ":initState Assignment : Action : init state : calendar exception : " + ex.getMessage());
+							M_log.info(this + ":initState Assignment : Action : init state : calendar exception : " + ex.getMessage());
 							
 						}
 					}
@@ -7864,18 +8182,6 @@ public class AssignmentAction extends PagedResourceActionII
 			state.setAttribute(SHOW_NUMBER_SUBMISSION_COLUMN, new Boolean(value));
 		}
 		
-		// whether the choice of emails instructor submission notification is available in the installation
-		if (state.getAttribute(ASSIGNMENT_INSTRUCTOR_NOTIFICATIONS) == null)
-		{
-			state.setAttribute(ASSIGNMENT_INSTRUCTOR_NOTIFICATIONS, Boolean.valueOf(ServerConfigurationService.getBoolean(ASSIGNMENT_INSTRUCTOR_NOTIFICATIONS, true)));
-		}
-		
-		// whether or how the instructor receive submission notification emails, none(default)|each|digest
-		if (state.getAttribute(ASSIGNMENT_INSTRUCTOR_NOTIFICATIONS_DEFAULT) == null)
-		{
-			state.setAttribute(ASSIGNMENT_INSTRUCTOR_NOTIFICATIONS_DEFAULT, ServerConfigurationService.getString(ASSIGNMENT_INSTRUCTOR_NOTIFICATIONS_DEFAULT, Assignment.ASSIGNMENT_INSTRUCTOR_NOTIFICATIONS_NONE));
-		}
-		
 		if (state.getAttribute(NEW_ASSIGNMENT_YEAR_RANGE_FROM) == null)
 		{
 			state.setAttribute(NEW_ASSIGNMENT_YEAR_RANGE_FROM, new Integer(2002));
@@ -7968,6 +8274,15 @@ public class AssignmentAction extends PagedResourceActionII
 		state.setAttribute(NEW_ASSIGNMENT_DUEHOUR, new Integer(5));
 		state.setAttribute(NEW_ASSIGNMENT_DUEMIN, new Integer(0));
 		state.setAttribute(NEW_ASSIGNMENT_DUEAMPM, "PM");
+		
+		// set the resubmit time to be the same as due time
+		state.setAttribute(ALLOW_RESUBMIT_CLOSEMONTH, new Integer(month));
+		state.setAttribute(ALLOW_RESUBMIT_CLOSEDAY, new Integer(day));
+		state.setAttribute(ALLOW_RESUBMIT_CLOSEYEAR, new Integer(year));
+		state.setAttribute(ALLOW_RESUBMIT_CLOSEHOUR, new Integer(5));
+		state.setAttribute(ALLOW_RESUBMIT_CLOSEMIN, new Integer(0));
+		state.setAttribute(ALLOW_RESUBMIT_CLOSEAMPM, "PM");
+		state.setAttribute(AssignmentSubmission.ALLOW_RESUBMIT_NUMBER, new Integer(1));
 
 		// enable the close date by default
 		state.setAttribute(NEW_ASSIGNMENT_ENABLECLOSEDATE, new Boolean(true));
@@ -9458,7 +9773,7 @@ public class AssignmentAction extends PagedResourceActionII
 		List returnResources = new Vector();
 
 		boolean allowAddAssignment = AssignmentService.allowAddAssignment(contextString);
-		if (mode.equalsIgnoreCase(MODE_LIST_ASSIGNMENTS))
+		if (MODE_LIST_ASSIGNMENTS.equals(mode))
 		{
 			String view = "";
 			if (state.getAttribute(STATE_SELECTED_VIEW) != null)
@@ -9523,12 +9838,12 @@ public class AssignmentAction extends PagedResourceActionII
 			
 			state.setAttribute(HAS_MULTIPLE_ASSIGNMENTS, Boolean.valueOf(returnResources.size() > 1));
 		}
-		else if (mode.equalsIgnoreCase(MODE_INSTRUCTOR_REORDER_ASSIGNMENT))
+		else if (MODE_INSTRUCTOR_REORDER_ASSIGNMENT.equals(mode))
 		{
 			returnResources = AssignmentService.getListAssignmentsForContext((String) state
 					.getAttribute(STATE_CONTEXT_STRING));
 		}
-		else if (mode.equalsIgnoreCase(MODE_INSTRUCTOR_REPORT_SUBMISSIONS))
+		else if (MODE_INSTRUCTOR_REPORT_SUBMISSIONS.equals(mode))
 		{
 			Vector submissions = new Vector();
 			
@@ -9589,7 +9904,7 @@ public class AssignmentAction extends PagedResourceActionII
 
 			returnResources = submissions;
 		}
-		else if (mode.equalsIgnoreCase(MODE_INSTRUCTOR_GRADE_ASSIGNMENT))
+		else if (MODE_INSTRUCTOR_GRADE_ASSIGNMENT.equals(mode))
 		{
 			// range
 			Collection groups = new Vector();
@@ -9601,6 +9916,7 @@ public class AssignmentAction extends PagedResourceActionII
 				List submissions = AssignmentService.getSubmissions(a);
 				
 				// now are we view all sections/groups or just specific one?
+				initViewSubmissionListOption(state);
 				String allOrOneGroup = (String) state.getAttribute(VIEW_SUBMISSION_LIST_OPTION);
 				if (allOrOneGroup.equals(rb.getString("gen.viewallgroupssections")))
 				{
@@ -9698,7 +10014,7 @@ public class AssignmentAction extends PagedResourceActionII
 													returnResources.add(new UserSubmission(u, sub));
 			
 											        // clear the permission
-											        SecurityService.clearAdvisors();
+											        SecurityService.popAdvisor();
 												}
 											}
 										}
@@ -9740,12 +10056,12 @@ public class AssignmentAction extends PagedResourceActionII
 		String sort = "";
 		ascending = (String) state.getAttribute(SORTED_ASC);
 		sort = (String) state.getAttribute(SORTED_BY);
-		if (mode.equalsIgnoreCase(MODE_INSTRUCTOR_GRADE_ASSIGNMENT) && (sort == null || !sort.startsWith("sorted_grade_submission_by")))
+		if (MODE_INSTRUCTOR_GRADE_ASSIGNMENT.equals(mode) && (sort == null || !sort.startsWith("sorted_grade_submission_by")))
 		{
 			ascending = (String) state.getAttribute(SORTED_GRADE_SUBMISSION_ASC);
 			sort = (String) state.getAttribute(SORTED_GRADE_SUBMISSION_BY);
 		}
-		else if (mode.equalsIgnoreCase(MODE_INSTRUCTOR_REPORT_SUBMISSIONS) && (sort == null || sort.startsWith("sorted_submission_by")))
+		else if (MODE_INSTRUCTOR_REPORT_SUBMISSIONS.equals(mode) && (sort == null || sort.startsWith("sorted_submission_by")))
 		{
 			ascending = (String) state.getAttribute(SORTED_SUBMISSION_ASC);
 			sort = (String) state.getAttribute(SORTED_SUBMISSION_BY);
@@ -9756,7 +10072,7 @@ public class AssignmentAction extends PagedResourceActionII
 			sort = (String) state.getAttribute(SORTED_BY);
 		}
 		
-		if ((returnResources.size() > 1) && !mode.equalsIgnoreCase(MODE_INSTRUCTOR_VIEW_STUDENTS_ASSIGNMENT))
+		if ((returnResources.size() > 1) && !MODE_INSTRUCTOR_VIEW_STUDENTS_ASSIGNMENT.equals(mode))
 		{
 			Collections.sort(returnResources, new AssignmentComparator(state, sort, ascending));
 		}
@@ -9781,19 +10097,19 @@ public class AssignmentAction extends PagedResourceActionII
 			String viewMode = data.getParameters().getString("view");
 			state.setAttribute(STATE_SELECTED_VIEW, viewMode);
 
-			if (viewMode.equals(MODE_LIST_ASSIGNMENTS))
+			if (MODE_LIST_ASSIGNMENTS.equals(viewMode))
 			{
 				doList_assignments(data);
 			}
-			else if (viewMode.equals(MODE_INSTRUCTOR_VIEW_STUDENTS_ASSIGNMENT))
+			else if (MODE_INSTRUCTOR_VIEW_STUDENTS_ASSIGNMENT.equals(viewMode))
 			{
 				doView_students_assignment(data);
 			}
-			else if (viewMode.equals(MODE_INSTRUCTOR_REPORT_SUBMISSIONS))
+			else if (MODE_INSTRUCTOR_REPORT_SUBMISSIONS.equals(viewMode))
 			{
 				doReport_submissions(data);
 			}
-			else if (viewMode.equals(MODE_STUDENT_VIEW))
+			else if (MODE_STUDENT_VIEW.equals(viewMode))
 			{
 				doView_student(data);
 			}
@@ -10064,19 +10380,11 @@ public class AssignmentAction extends PagedResourceActionII
 	private String processFormattedTextFromBrowser(SessionState state, String strFromBrowser, boolean checkForFormattingErrors)
 	{
 		StringBuilder alertMsg = new StringBuilder();
-		try
-		{
-			boolean replaceWhitespaceTags = true;
-			String text = FormattedText.processFormattedText(strFromBrowser, alertMsg, checkForFormattingErrors,
-					replaceWhitespaceTags);
-			if (alertMsg.length() > 0) addAlert(state, alertMsg.toString());
-			return text;
-		}
-		catch (Exception e)
-		{
-			M_log.warn(this + ":processFormattedTextFromBrowser " + e.getMessage());
-			return strFromBrowser;
-		}
+		boolean replaceWhitespaceTags = true;
+		String text = FormattedText.processFormattedText(strFromBrowser, alertMsg, checkForFormattingErrors,
+				replaceWhitespaceTags);
+		if (alertMsg.length() > 0) addAlert(state, alertMsg.toString());
+		return text;
 	}
 
 	/**
@@ -10108,7 +10416,7 @@ public class AssignmentAction extends PagedResourceActionII
 			numopentags--;
 		}
 
-		boolean checkForFormattingErrors = false; // so that grading isn't held up by formatting errors
+		boolean checkForFormattingErrors = true; // so that grading isn't held up by formatting errors
 		buf = new StringBuilder(processFormattedTextFromBrowser(state, buf.toString(), checkForFormattingErrors));
 
 		while ((pos = buf.indexOf("<ins>")) != -1)
@@ -10232,18 +10540,18 @@ public class AssignmentAction extends PagedResourceActionII
 		String mode = (String) state.getAttribute(STATE_MODE);
 		ParameterParser params = data.getParameters();
 
-		if (mode.equals(MODE_STUDENT_VIEW_SUBMISSION) || mode.equals(MODE_STUDENT_PREVIEW_SUBMISSION)
-				|| mode.equals(MODE_STUDENT_VIEW_GRADE) || mode.equals(MODE_INSTRUCTOR_NEW_EDIT_ASSIGNMENT)
-				|| mode.equals(MODE_INSTRUCTOR_DELETE_ASSIGNMENT) || mode.equals(MODE_INSTRUCTOR_GRADE_SUBMISSION)
-				|| mode.equals(MODE_INSTRUCTOR_PREVIEW_GRADE_SUBMISSION) || mode.equals(MODE_INSTRUCTOR_PREVIEW_ASSIGNMENT)
-				|| mode.equals(MODE_INSTRUCTOR_VIEW_ASSIGNMENT) || mode.equals(MODE_INSTRUCTOR_REORDER_ASSIGNMENT))
+		if (MODE_STUDENT_VIEW_SUBMISSION.equals(mode) || MODE_STUDENT_PREVIEW_SUBMISSION.equals(mode)
+				|| MODE_STUDENT_VIEW_GRADE.equals(mode) || MODE_INSTRUCTOR_NEW_EDIT_ASSIGNMENT.equals(mode)
+				|| MODE_INSTRUCTOR_DELETE_ASSIGNMENT.equals(mode) || MODE_INSTRUCTOR_GRADE_SUBMISSION.equals(mode)
+				|| MODE_INSTRUCTOR_PREVIEW_GRADE_SUBMISSION.equals(mode)|| MODE_INSTRUCTOR_PREVIEW_ASSIGNMENT.equals(mode)
+				|| MODE_INSTRUCTOR_VIEW_ASSIGNMENT.equals(mode) || MODE_INSTRUCTOR_REORDER_ASSIGNMENT.equals(mode))
 		{
 			if (state.getAttribute(ALERT_GLOBAL_NAVIGATION) == null)
 			{
 				addAlert(state, rb.getString("alert.globalNavi"));
 				state.setAttribute(ALERT_GLOBAL_NAVIGATION, Boolean.TRUE);
 
-				if (mode.equals(MODE_STUDENT_VIEW_SUBMISSION))
+				if (MODE_STUDENT_VIEW_SUBMISSION.equals(mode))
 				{
 					// retrieve the submission text (as formatted text)
 					boolean checkForFormattingErrors = true; // the student is submitting something - so check for errors
@@ -10261,11 +10569,11 @@ public class AssignmentAction extends PagedResourceActionII
 					// User[] users = { UserDirectoryService.getCurrentUser() };
 					// state.setAttribute(ResourcesAction.STATE_SAVE_ATTACHMENT_IN_DROPBOX, users);
 				}
-				else if (mode.equals(MODE_INSTRUCTOR_NEW_EDIT_ASSIGNMENT))
+				else if (MODE_INSTRUCTOR_NEW_EDIT_ASSIGNMENT.equals(mode))
 				{
 					setNewAssignmentParameters(data, false);
 				}
-				else if (mode.equals(MODE_INSTRUCTOR_GRADE_SUBMISSION))
+				else if (MODE_INSTRUCTOR_GRADE_SUBMISSION.equals(mode))
 				{
 					readGradeForm(data, state, "read");
 				}
@@ -10714,9 +11022,6 @@ public class AssignmentAction extends PagedResourceActionII
 					}
 					else if(fileData.length > 0)
 					{	
-						ZipInputStream zin = new ZipInputStream(new ByteArrayInputStream(fileData));
-						ZipEntry entry;
-						
 						// a flag value for checking whether the zip file is of proper format: 
 						// should have a grades.csv file if there is no user folders
 						boolean zipHasGradeFile = false;
@@ -10724,10 +11029,23 @@ public class AssignmentAction extends PagedResourceActionII
 						boolean zipHasFolder = false;
 						boolean zipHasFolderValidUserId = false;
 						
+						FileOutputStream tmpFileOut = null;
+						File tempFile = null;
 						try
 						{
-							while ((entry=zin.getNextEntry()) != null)
+							tempFile = File.createTempFile(String.valueOf(System.currentTimeMillis()),"");
+							
+							tmpFileOut = new FileOutputStream(tempFile);
+							tmpFileOut.write(fileData);
+							tmpFileOut.flush();
+							tmpFileOut.close();
+
+							ZipFile zipFile = new ZipFile(tempFile, "UTF-8");
+							Enumeration<ZipEntry> zipEntries = zipFile.getEntries();
+							ZipEntry entry;
+							while (zipEntries.hasMoreElements())
 							{
+								entry = zipEntries.nextElement();
 								String entryName = entry.getName();
 								if (!entry.isDirectory() && entryName.indexOf("/.") == -1)
 								{
@@ -10739,7 +11057,7 @@ public class AssignmentAction extends PagedResourceActionII
 										if (hasGradeFile)
 										{
 											// read grades.cvs from zip
-									        String result = StringUtil.trimToZero(readIntoString(zin));
+											String result = StringUtil.trimToZero(readIntoString(zipFile.getInputStream(entry)));
 									        String[] lines=null;
 									        if (result.indexOf("\r\n") != -1)
 									        	lines = result.split("\r\n");
@@ -10818,7 +11136,7 @@ public class AssignmentAction extends PagedResourceActionII
 											if (hasComment && entryName.indexOf("comments") != -1)
 											{
 												// read the comments file
-												String comment = getBodyTextFromZipHtml(zin);
+												String comment = getBodyTextFromZipHtml(zipFile.getInputStream(entry));
 										        if (comment != null)
 										        {
 										        		UploadGradeWrapper r = (UploadGradeWrapper) submissionTable.get(userEid);
@@ -10829,7 +11147,7 @@ public class AssignmentAction extends PagedResourceActionII
 											if (hasFeedbackText && entryName.indexOf("feedbackText") != -1)
 											{
 												// upload the feedback text
-												String text = getBodyTextFromZipHtml(zin);
+												String text = getBodyTextFromZipHtml(zipFile.getInputStream(entry));
 												if (text != null)
 										        {
 										        		UploadGradeWrapper r = (UploadGradeWrapper) submissionTable.get(userEid);
@@ -10840,7 +11158,7 @@ public class AssignmentAction extends PagedResourceActionII
 											if (hasSubmissionText && entryName.indexOf("_submissionText") != -1)
 											{
 												// upload the student submission text
-												String text = getBodyTextFromZipHtml(zin);
+												String text = getBodyTextFromZipHtml(zipFile.getInputStream(entry));
 												if (text != null)
 										        {
 										        		UploadGradeWrapper r = (UploadGradeWrapper) submissionTable.get(userEid);
@@ -10857,7 +11175,7 @@ public class AssignmentAction extends PagedResourceActionII
 													// clear the submission attachment first
 													UploadGradeWrapper r = (UploadGradeWrapper) submissionTable.get(userEid);
 													submissionTable.put(userEid, r);
-													submissionTable = uploadZipAttachments(state, submissionTable, zin, entry, entryName, userEid, "submission");
+													submissionTable = uploadZipAttachments(state, submissionTable, zipFile.getInputStream(entry), entry, entryName, userEid, "submission");
 												}
 											}
 											if (hasFeedbackAttachment)
@@ -10869,14 +11187,14 @@ public class AssignmentAction extends PagedResourceActionII
 													// clear the feedback attachment first
 													UploadGradeWrapper r = (UploadGradeWrapper) submissionTable.get(userEid);
 													submissionTable.put(userEid, r);
-													submissionTable = uploadZipAttachments(state, submissionTable, zin, entry, entryName, userEid, "feedback");
+													submissionTable = uploadZipAttachments(state, submissionTable, zipFile.getInputStream(entry), entry, entryName, userEid, "feedback");
 												}
 											}
 											
 											// if this is a timestamp file
 											if (entryName.indexOf("timestamp") != -1)
 											{
-												byte[] timeStamp = readIntoBytes(zin, entryName, entry.getSize());
+												byte[] timeStamp = readIntoBytes(zipFile.getInputStream(entry), entryName, entry.getSize());
 												UploadGradeWrapper r = (UploadGradeWrapper) submissionTable.get(userEid);
 								        		r.setSubmissionTimestamp(new String(timeStamp));
 								        		submissionTable.put(userEid, r);
@@ -10891,6 +11209,22 @@ public class AssignmentAction extends PagedResourceActionII
 							// uploaded file is not a valid archive
 							addAlert(state, rb.getString("uploadall.alert.zipFile"));
 							M_log.warn(this + ":doUpload_all_upload " + e.getMessage());
+						}
+						finally
+						{
+							if (tmpFileOut != null) {
+								try {
+									tmpFileOut.close();
+								} catch (IOException e) {
+									M_log.warn(this + ": Error closing temp file output stream: " + e.toString());
+								}
+							}
+							//clean up the zip file
+							if (tempFile != null && tempFile.exists()) {
+								if (!tempFile.delete()) {
+									M_log.warn("Failed to clean up temp file");
+								}
+							}
 						}
 						
 						if ((!zipHasGradeFile && !zipHasFolder)					// generate error when there is no grade file and no folder structure
@@ -11054,7 +11388,7 @@ public class AssignmentAction extends PagedResourceActionII
 	 * @param userEid
 	 * @param submissionOrFeedback
 	 */
-	private Hashtable uploadZipAttachments(SessionState state, Hashtable submissionTable, ZipInputStream zin, ZipEntry entry, String entryName, String userEid, String submissionOrFeedback) {
+	private Hashtable uploadZipAttachments(SessionState state, Hashtable submissionTable, InputStream zin, ZipEntry entry, String entryName, String userEid, String submissionOrFeedback) {
 		// upload all the files as instructor attachments to the submission for grading purpose
 		String fName = entryName.substring(entryName.lastIndexOf("/") + 1, entryName.length());
 		ContentTypeImageService iService = (ContentTypeImageService) state.getAttribute(STATE_CONTENT_TYPE_IMAGE_SERVICE);
@@ -11103,7 +11437,7 @@ public class AssignmentAction extends PagedResourceActionII
 		return submissionTable;
 	}
 
-	private String getBodyTextFromZipHtml(ZipInputStream zin)
+	private String getBodyTextFromZipHtml(InputStream zin)
 	{
 		String rv = "";
 		try
@@ -11127,7 +11461,7 @@ public class AssignmentAction extends PagedResourceActionII
 		return rv;
 	}
 
-	private byte[] readIntoBytes(ZipInputStream zin, String fName, long length) throws IOException {
+	private byte[] readIntoBytes(InputStream zin, String fName, long length) throws IOException {
 			
 			byte[] buffer = new byte[4096];
 			
@@ -11140,7 +11474,7 @@ public class AssignmentAction extends PagedResourceActionII
     			{
     				fout.write(buffer, 0, len);
     			}
-    			zin.closeEntry();
+    			zin.close();
 			} finally {
 			    fout.close();
 			}
@@ -11161,7 +11495,7 @@ public class AssignmentAction extends PagedResourceActionII
 			return data;
 	}
 	
-	private String readIntoString(ZipInputStream zin) throws IOException 
+	private String readIntoString(InputStream zin) throws IOException 
 	{
 		StringBuilder buffer = new StringBuilder();
 		int size = 2048;
@@ -11174,11 +11508,11 @@ public class AssignmentAction extends PagedResourceActionII
 				if (size > 0)
 				{
 					buffer.append(new String(data, 0, size));
-	             }
-	             else
-	             {
-	                 break;
-	             }
+				}
+				else
+				{
+					break;
+				}
 			}
 			catch (IOException e)
 			{
@@ -11714,12 +12048,10 @@ public class AssignmentAction extends PagedResourceActionII
 				try
 				{
 					String siteId = ToolManager.getCurrentPlacement().getContext();
-
-					String toolName = "Assignment";
 					
 					// add attachment
 					enableSecurityAdvisor();
-					ContentResource attachment = m_contentHostingService.addAttachmentResource(resourceId, siteId, toolName, contentType, bytes, props);
+					ContentResource attachment = m_contentHostingService.addAttachmentResource(resourceId, siteId, getToolTitle(), contentType, bytes, props);
 					disableSecurityAdvisors();
 					
 					// construct the state variable for attachment list
@@ -11774,7 +12106,7 @@ public class AssignmentAction extends PagedResourceActionII
     protected void disableSecurityAdvisors()
     {
     	// remove all security advisors
-    	SecurityService.clearAdvisors();
+    	SecurityService.popAdvisor();
     }
 
     /**
