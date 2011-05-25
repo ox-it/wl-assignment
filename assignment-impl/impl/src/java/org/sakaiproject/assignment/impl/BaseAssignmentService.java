@@ -42,6 +42,8 @@ import org.sakaiproject.calendar.api.CalendarService;
 import org.sakaiproject.component.api.ServerConfigurationService;
 import org.sakaiproject.component.cover.ComponentManager;
 import org.sakaiproject.content.api.ContentHostingService;
+import org.sakaiproject.content.api.ContentCopy;
+import org.sakaiproject.content.api.ContentCopyContext;
 import org.sakaiproject.content.api.ContentResource;
 import org.sakaiproject.content.api.ContentResourceEdit;
 import org.sakaiproject.content.util.ZipContentUtil;
@@ -152,6 +154,9 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 		this.assignmentPeerAssessmentService = assignmentPeerAssessmentService;
 	}
 
+	protected ContentCopy contentCopy;
+	public void setContentCopy(ContentCopy contentCopy) {
+		this.contentCopy = contentCopy;
 	}
 
 	private SecurityService securityService = null;
@@ -6497,6 +6502,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 		Map<String, String> transversalMap = new HashMap<String, String>();
 		// import Assignment objects
 		Iterator oAssignments = getAssignmentsForContext(fromContext);
+		ContentCopyContext context = contentCopy.createCopyContext(fromContext, toContext, true);
 		while (oAssignments.hasNext())
 		{
 			Assignment oAssignment = (Assignment) oAssignments.next();
@@ -6545,13 +6551,9 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 							nContent.setHonorPledge(oContent.getHonorPledge());
 							nContent.setHideDueDate(oContent.getHideDueDate());
 							nContent.setIndividuallyGraded(oContent.individuallyGraded());
-							// replace all occurrence of old context with new context inside instruction text
-							String instructions = oContent.getInstructions();
-							if (instructions.indexOf(fromContext) != -1)
-							{
-								instructions = instructions.replaceAll(fromContext, toContext);
-							}
-							nContent.setInstructions(instructions);
+							// Update references to resources.
+							String newInstructions = contentCopy.convertContent(context, oContent.getInstructions(), "text/html", null);
+							nContent.setInstructions(newInstructions);
 							nContent.setMaxGradePoint(oContent.getMaxGradePoint());
 							nContent.setReleaseGrades(oContent.releaseGrades());
 							nContent.setTimeLastModified(oContent.getTimeLastModified());
@@ -6685,7 +6687,9 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 				} // if-else
 			} // if
 		} // for
+		contentCopy.copyReferences(context);
 		return transversalMap;
+		// Copy the files in resources
 	} // importResources
 
 	/**
