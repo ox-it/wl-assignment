@@ -81,6 +81,8 @@ import org.sakaiproject.authz.cover.SecurityService;
 import org.sakaiproject.authz.api.SecurityAdvisor;
 import org.sakaiproject.authz.api.SecurityAdvisor.SecurityAdvice;
 import org.sakaiproject.component.api.ServerConfigurationService;
+import org.sakaiproject.content.api.ContentCopy;
+import org.sakaiproject.content.api.ContentCopyContext;
 import org.sakaiproject.content.api.ContentResource;
 import org.sakaiproject.content.api.ContentResourceEdit;
 import org.sakaiproject.content.api.ResourceType;
@@ -261,6 +263,10 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 		this.contentReviewService = contentReviewService;
 	}
 	
+	protected ContentCopy contentCopy;
+	public void setContentCopy(ContentCopy contentCopy) {
+		this.contentCopy = contentCopy;
+	}
 
 	
 	/**********************************************************************************************************************************************************************************************************************************************************
@@ -4901,6 +4907,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 	{
 		// import Assignment objects
 		Iterator oAssignments = getAssignmentsForContext(fromContext);
+		ContentCopyContext context = contentCopy.createCopyContext(fromContext, toContext, true);
 		while (oAssignments.hasNext())
 		{
 			Assignment oAssignment = (Assignment) oAssignments.next();
@@ -4949,7 +4956,9 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 							nContent.setGroupProject(oContent.getGroupProject());
 							nContent.setHonorPledge(oContent.getHonorPledge());
 							nContent.setIndividuallyGraded(oContent.individuallyGraded());
-							nContent.setInstructions(oContent.getInstructions());
+							// Update references to resources.
+							String newInstructions = contentCopy.convertContent(context, oContent.getInstructions(), "text/html", null);
+							nContent.setInstructions(newInstructions);
 							nContent.setMaxGradePoint(oContent.getMaxGradePoint());
 							nContent.setReleaseGrades(oContent.releaseGrades());
 							nContent.setTimeLastModified(oContent.getTimeLastModified());
@@ -5061,6 +5070,8 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 				} // if-else
 			} // if
 		} // for
+		// Copy the files in resources
+		contentCopy.copyReferences(context);
 	} // importResources
 
 	/**
