@@ -7428,6 +7428,13 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 		
 		protected boolean m_allowStudentViewReport;
 
+		String m_submitReviewRepo;
+		String m_generateOriginalityReport;
+		boolean m_checkTurnitin;
+		boolean m_checkInternet;
+		boolean m_checkPublications;
+		boolean m_checkInstitution;
+		
 		protected Time m_timeCreated;
 
 		protected Time m_timeLastModified;
@@ -7493,6 +7500,12 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			m_allowAttachments = getBool(el.getAttribute("allowattach"));
 			m_allowReviewService = getBool(el.getAttribute("allowreview"));
 			m_allowStudentViewReport = getBool(el.getAttribute("allowstudentview"));
+			m_submitReviewRepo = el.getAttribute("submitReviewRepo");
+			m_generateOriginalityReport = el.getAttribute("generateOriginalityReport");
+			m_checkTurnitin = getBool(el.getAttribute("checkTurnitin"));
+			m_checkInternet = getBool(el.getAttribute("checkInternet"));
+			m_checkPublications = getBool(el.getAttribute("checkPublications"));
+			m_checkInstitution = getBool(el.getAttribute("checkInstitution"));
 			
 			m_timeCreated = getTimeObject(el.getAttribute("datecreated"));
 			m_timeLastModified = getTimeObject(el.getAttribute("lastmod"));
@@ -7670,6 +7683,12 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 							m_allowAttachments = getBool(attributes.getValue("allowattach"));
 							m_allowReviewService = getBool(attributes.getValue("allowreview"));
 							m_allowStudentViewReport = getBool(attributes.getValue("allowstudentview"));
+							m_submitReviewRepo = attributes.getValue("submitReviewRepo");
+							m_generateOriginalityReport = attributes.getValue("generateOriginalityReport");
+							m_checkTurnitin = getBool(attributes.getValue("checkTurnitin"));
+							m_checkInternet = getBool(attributes.getValue("checkInternet"));
+							m_checkPublications = getBool(attributes.getValue("checkPublications"));
+							m_checkInstitution = getBool(attributes.getValue("checkInstitution"));
 							
 							m_timeCreated = getTimeObject(attributes.getValue("datecreated"));
 							m_timeLastModified = getTimeObject(attributes.getValue("lastmod"));
@@ -7818,6 +7837,12 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 		
 			content.setAttribute("allowreview", getBoolString(m_allowReviewService));
 			content.setAttribute("allowstudentview", getBoolString(m_allowStudentViewReport));
+			content.setAttribute("submitReviewRepo", m_submitReviewRepo);
+			content.setAttribute("generateOriginalityReport", m_generateOriginalityReport);
+			content.setAttribute("checkTurnitin", getBoolString(m_checkTurnitin));
+			content.setAttribute("checkInternet", getBoolString(m_checkInternet));
+			content.setAttribute("checkPublications", getBoolString(m_checkPublications));
+			content.setAttribute("checkInstitution", getBoolString(m_checkInstitution));
 			
 			content.setAttribute("honorpledge", String.valueOf(m_honorPledge));
 			content.setAttribute("submissiontype", String.valueOf(m_typeOfSubmission));
@@ -7886,7 +7911,12 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 				//Uct
 				m_allowReviewService = content.getAllowReviewService();
 				m_allowStudentViewReport = content.getAllowStudentViewReport();
-				
+				m_submitReviewRepo = content.getSubmitReviewRepo();
+				m_generateOriginalityReport = content.getGenerateOriginalityReport();
+				m_checkTurnitin = content.isCheckTurnitin();
+				m_checkInternet = content.isCheckInternet();
+				m_checkPublications = content.isCheckPublications();
+				m_checkInstitution = content.isCheckInstitution();
 				m_timeCreated = content.getTimeCreated();
 				m_timeLastModified = content.getTimeLastModified();
 				m_properties = new BaseResourcePropertiesEdit();
@@ -8274,6 +8304,54 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			return compare;
 
 		} // compareTo
+
+		public String getSubmitReviewRepo() {
+			return m_submitReviewRepo;
+		}
+
+		public void setSubmitReviewRepo(String m_submitReviewRepo) {
+			this.m_submitReviewRepo = m_submitReviewRepo;
+		}
+
+		public String getGenerateOriginalityReport() {
+			return m_generateOriginalityReport;
+		}
+
+		public void setGenerateOriginalityReport(String m_generateOriginalityReport) {
+			this.m_generateOriginalityReport = m_generateOriginalityReport;
+		}
+
+		public boolean isCheckTurnitin() {
+			return m_checkTurnitin;
+		}
+
+		public void setCheckTurnitin(boolean m_checkTurnitin) {
+			this.m_checkTurnitin = m_checkTurnitin;
+		}
+
+		public boolean isCheckInternet() {
+			return m_checkInternet;
+		}
+
+		public void setCheckInternet(boolean m_checkInternet) {
+			this.m_checkInternet = m_checkInternet;
+		}
+
+		public boolean isCheckPublications() {
+			return m_checkPublications;
+		}
+
+		public void setCheckPublications(boolean m_checkPublications) {
+			this.m_checkPublications = m_checkPublications;
+		}
+
+		public boolean isCheckInstitution() {
+			return m_checkInstitution;
+		}
+
+		public void setCheckInstitution(boolean m_checkInstitution) {
+			this.m_checkInstitution = m_checkInstitution;
+		}
 
 	}// BaseAssignmentContent
 
@@ -8884,8 +8962,30 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 
                     // This should use getLocalizedReviewErrorMessage(contentId)
                     // to get a i18n message of the error
-                    return contentReviewService.getReviewError(contentId);
-
+                    Long status = contentReviewService.getReviewStatus(contentId);
+                    String errorMessage = null; 
+                    
+                    if (status != null) {
+                        if (status.equals(ContentReviewItem.REPORT_ERROR_NO_RETRY_CODE)) {
+                            errorMessage = rb.getString("content_review.error.REPORT_ERROR_NO_RETRY_CODE");
+                        } else if (status.equals(ContentReviewItem.REPORT_ERROR_RETRY_CODE)) {
+                            errorMessage = rb.getString("content_review.error.REPORT_ERROR_RETRY_CODE");
+                        } else if (status.equals(ContentReviewItem.SUBMISSION_ERROR_NO_RETRY_CODE)) {
+                            errorMessage = rb.getString("content_review.error.SUBMISSION_ERROR_NO_RETRY_CODE");
+                        } else if (status.equals(ContentReviewItem.SUBMISSION_ERROR_RETRY_CODE)) {
+                            errorMessage = rb.getString("content_review.error.SUBMISSION_ERROR_RETRY_CODE");
+                        } else if (status.equals(ContentReviewItem.SUBMISSION_ERROR_RETRY_EXCEEDED)) {
+                            errorMessage = rb.getString("content_review.error.SUBMISSION_ERROR_RETRY_EXCEEDED_CODE");
+                        } else if (status.equals(ContentReviewItem.SUBMISSION_ERROR_USER_DETAILS_CODE)) {
+                            errorMessage = rb.getString("content_review.error.SUBMISSION_ERROR_USER_DETAILS_CODE");
+                        }
+                    }
+                    
+                    if (errorMessage == null) {
+                        errorMessage = rb.getString("assignment2.content_review.error");
+                    }
+                    
+                    return errorMessage;
                 } catch (Exception e) {
                     //e.printStackTrace();
                     M_log.warn(this + ":getReviewError() " + e.getMessage());
