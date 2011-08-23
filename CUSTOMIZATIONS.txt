@@ -1,1 +1,1 @@
-
+SAK-20702 Add functionality to assignments UI to show the error message for Content Review Service

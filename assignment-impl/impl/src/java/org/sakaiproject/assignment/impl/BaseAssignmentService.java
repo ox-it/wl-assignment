@@ -2956,6 +2956,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 					edit.setReviewScore(report.getReviewScore());
 					edit.setReviewIconUrl(report.getIconUrl());
 					edit.setReviewStatus(report.getStatus().toString());
+                    edit.setReviewError(report.getLastError());
 					this.commitEdit(edit);
 				} catch (IdUnusedException e) {
 					// TODO Auto-generated catch block
@@ -8726,6 +8727,8 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 		protected String m_reviewStatus;
 		
 		protected String m_reviewIconUrl;
+
+        protected String m_reviewError;
 		
 		// return the variables
 		// Get new values from review service if defaults
@@ -8736,7 +8739,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 				M_log.debug(this + " getReviewScore Content review is not enabled for this assignment");
 				return -2;
 			}
-			
+
 			if (m_submittedAttachments.isEmpty()) {
 				M_log.debug(this + " getReviewScore No attachments submitted.");
 				return -2;
@@ -8748,18 +8751,27 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 					M_log.debug("returning stored value of " + m_reviewScore);
 					return m_reviewScore.intValue();
 				}
-				
+
 				ContentResource cr = getFirstAcceptableAttachement();
 				if (cr == null )
 				{
 					M_log.debug(this + " getReviewScore No suitable attachments found in list");
 					return -2;
 				}
-				
+
+
+
 				try {
 					//we need to find the first attachment the CR will accept
 					String contentId = cr.getId();
 					M_log.debug(this + " getReviewScore checking for score for content: " + contentId);
+
+                    Long status = contentReviewService.getReviewStatus(contentId);
+                    if (status != null && (status.equals(ContentReviewItem.NOT_SUBMITTED_CODE) || status.equals(ContentReviewItem.SUBMITTED_AWAITING_REPORT_CODE)))  {
+                        M_log.debug(this + " getReviewStatus returned a status of: " + status);
+                        return -2;
+                    }
+
 					int score = contentReviewService.getReviewScore(contentId);
 					m_reviewScore = score;
 					M_log.debug(this + " getReviewScore CR returned a score of: " + score);
@@ -8789,8 +8801,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 					
 				}
 				catch (Exception e) {
-					
-						M_log.warn(" getReviewScore " + e.getMessage());
+					M_log.warn(this + " getReviewScore " + e.getMessage());
 					return -1;
 				}
 					
@@ -8852,7 +8863,39 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 		public String getReviewStatus() {
 			return m_reviewStatus;
 		}
-		
+
+        public String getReviewError() {
+        //	Code to get  error report
+            if (m_submittedAttachments.isEmpty()) {
+                M_log.debug(this.getId() + " getReviewError No attachments submitted.");
+                return null;
+            }
+            else
+            {
+                try {
+                    ContentResource cr = getFirstAcceptableAttachement();
+                    if (cr == null )
+                    {
+                        M_log.debug(this + " getReviewError No suitable attachments found in list");
+                        return null;
+                    }
+
+                    String contentId = cr.getId();
+
+                    // This should use getLocalizedReviewErrorMessage(contentId)
+                    // to get a i18n message of the error
+                    return contentReviewService.getReviewError(contentId);
+
+                } catch (Exception e) {
+                    //e.printStackTrace();
+                    M_log.warn(this + ":getReviewError() " + e.getMessage());
+                    return null;
+                }
+
+            }
+        }
+
+
 		public String getReviewIconUrl() {
 			if (m_reviewIconUrl == null )
 				m_reviewIconUrl = contentReviewService.getIconUrlforScore(Long.valueOf(this.getReviewScore()));
@@ -8886,6 +8929,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			m_reviewStatus = "";
 			m_reviewScore = -1;
 			m_reviewReport = "Not available yet";
+            m_reviewError = "";
 			
 			m_id = id;
 			m_assignment = assignId;
@@ -9146,6 +9190,13 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 					m_reviewStatus = el.getAttribute("reviewStatus");
 				else 
 					m_reviewStatus = "";
+
+            // The status of the review service
+                if (el.getAttribute("reviewError")!=null)
+                    m_reviewError = el.getAttribute("reviewError");
+                else
+                    m_reviewError = "";
+
 			}
 			catch (Exception e) {
 				M_log.error("error constructing Submission: " + e);
@@ -9155,6 +9206,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			if (contentReviewService != null) {
 				m_reviewStatus = this.getReviewStatus();
 				m_reviewScore  = this.getReviewScore();
+                m_reviewError = this.getReviewError();
 			}
 			
 			
@@ -9209,6 +9261,13 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 									m_reviewStatus = attributes.getValue("reviewStatus");
 								else 
 									m_reviewStatus = "";
+
+                            // The status of the review service
+                                if (attributes.getValue("reviewError")!=null)
+                                    m_reviewError = attributes.getValue("reviewError");
+                                else
+                                    m_reviewError = "";
+
 							}
 							catch (Exception e) {
 								M_log.error("error constructing Submission: " + e);
@@ -9374,6 +9433,8 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			submission.setAttribute("reviewScore",m_reviewScore == null ? "" : Integer.toString(m_reviewScore));
 			submission.setAttribute("reviewReport",m_reviewReport == null ? "" : m_reviewReport);
 			submission.setAttribute("reviewStatus",m_reviewStatus == null ? "" : m_reviewStatus);
+            submission.setAttribute("reviewError",m_reviewError == null ? "" : m_reviewError);
+
 			
 			submission.setAttribute("id", m_id == null ? "" : m_id);
 			submission.setAttribute("context", m_context == null ? "" : m_context);
@@ -9456,6 +9517,8 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 				m_reviewReport = submission.getReviewReport();
 				// The status of the review service
 				m_reviewStatus = submission.getReviewStatus();
+                // Error msg, if any from review service
+                m_reviewError = submission.getReviewError();
 			}
 			
 			m_id = submission.getId();
@@ -10678,6 +10741,11 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 		
 			
 		}
+
+        public void setReviewError(String error) {
+            this.m_reviewError = error;
+        }
+
 
 	} // BaseAssignmentSubmissionEdit
 
