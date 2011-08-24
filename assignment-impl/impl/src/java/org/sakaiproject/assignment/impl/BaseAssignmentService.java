@@ -7430,10 +7430,10 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 
 		String m_submitReviewRepo;
 		String m_generateOriginalityReport;
-		boolean m_checkTurnitin;
-		boolean m_checkInternet;
-		boolean m_checkPublications;
-		boolean m_checkInstitution;
+		boolean m_checkTurnitin = true;
+		boolean m_checkInternet = true;
+		boolean m_checkPublications = true;
+		boolean m_checkInstitution = true;
 		
 		protected Time m_timeCreated;
 
