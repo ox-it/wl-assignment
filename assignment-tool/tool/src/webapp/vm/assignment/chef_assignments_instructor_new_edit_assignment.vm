@@ -498,6 +498,7 @@ $(document).ready(function() {
 				#else
 					<div id="reviewServiceOptions" style="display:none" class="indnt3">
 				#end
+					$tlang.getString("content_review.note")
 					
 					$tlang.getString("review.submit.papers.repository")
 					<br/>
