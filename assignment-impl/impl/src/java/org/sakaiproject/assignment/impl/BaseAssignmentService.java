@@ -59,6 +59,7 @@ import org.sakaiproject.contentreview.service.ContentReviewService;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.commons.lang.math.NumberUtils;
 import org.apache.poi.hssf.usermodel.HSSFCell;
 import org.apache.poi.hssf.usermodel.HSSFCellStyle;
 import org.apache.poi.hssf.usermodel.HSSFFont;
@@ -3336,7 +3337,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 		if (submission == null) throw new IdUnusedException(submissionId);
 		
 		// double check the submission submitter information:
-		// if current user is not the original submitter and if he doesn't have grading permission, he should have access to other people's submission.
+		// if current user is not the original submitter and if he doesn't have grading permission, he should not have access to other people's submission.
 		String assignmentRef = assignmentReference(submission.getContext(), submission.getAssignmentId());
 		if (!allowGradeSubmission(assignmentRef))
 		{
@@ -3646,7 +3647,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			}
 			
 			// if the user has SECURE_ALL_GROUPS in the context (site), select all site groups
-			if (AuthzGroupService.isAllowed(userId, SECURE_ALL_GROUPS, SiteService.siteReference(context)) && unlockCheck(function, SiteService.siteReference(context)))
+			if (SecurityService.unlock(userId, SECURE_ALL_GROUPS, SiteService.siteReference(context)) && unlockCheck(function, SiteService.siteReference(context)))
 			{
 				return groups;
 			}
@@ -4167,7 +4168,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 								{
 									// String cell type
 									cell = row.getCell(cellNum);
-									cell.setCellValue(submission.getGrade());
+									cell.setCellValue(submission.getGradeDisplay());
 								}
 							}
 							else if (submission.getSubmitted() && submission.getTimeSubmitted() != null)
@@ -4279,25 +4280,27 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 						        enableSecurityAdvisor();
 						        
 								AssignmentSubmissionEdit s = addSubmission(contextString, a.getId(), u.getId());
-								s.setSubmitted(true);
-								s.setAssignment(a);
-								
-								// set the resubmission properties
-								// get the assignment setting for resubmitting
-								ResourceProperties assignmentProperties = a.getProperties();
-								String assignmentAllowResubmitNumber = assignmentProperties.getProperty(AssignmentSubmission.ALLOW_RESUBMIT_NUMBER);
-								if (assignmentAllowResubmitNumber != null)
+								if (s != null)
 								{
-									s.getPropertiesEdit().addProperty(AssignmentSubmission.ALLOW_RESUBMIT_NUMBER, assignmentAllowResubmitNumber);
+									s.setSubmitted(true);
+									s.setAssignment(a);
 									
-									String assignmentAllowResubmitCloseDate = assignmentProperties.getProperty(AssignmentSubmission.ALLOW_RESUBMIT_CLOSETIME);
-									// if assignment's setting of resubmit close time is null, use assignment close time as the close time for resubmit
-									s.getPropertiesEdit().addProperty(AssignmentSubmission.ALLOW_RESUBMIT_CLOSETIME, assignmentAllowResubmitCloseDate != null?assignmentAllowResubmitCloseDate:String.valueOf(a.getCloseTime().getTime()));
+									// set the resubmission properties
+									// get the assignment setting for resubmitting
+									ResourceProperties assignmentProperties = a.getProperties();
+									String assignmentAllowResubmitNumber = assignmentProperties.getProperty(AssignmentSubmission.ALLOW_RESUBMIT_NUMBER);
+									if (assignmentAllowResubmitNumber != null)
+									{
+										s.getPropertiesEdit().addProperty(AssignmentSubmission.ALLOW_RESUBMIT_NUMBER, assignmentAllowResubmitNumber);
+										
+										String assignmentAllowResubmitCloseDate = assignmentProperties.getProperty(AssignmentSubmission.ALLOW_RESUBMIT_CLOSETIME);
+										// if assignment's setting of resubmit close time is null, use assignment close time as the close time for resubmit
+										s.getPropertiesEdit().addProperty(AssignmentSubmission.ALLOW_RESUBMIT_CLOSETIME, assignmentAllowResubmitCloseDate != null?assignmentAllowResubmitCloseDate:String.valueOf(a.getCloseTime().getTime()));
+									}
+									
+									commitEdit(s);
+									rv.add(u.getId());
 								}
-								
-								commitEdit(s);
-								rv.add(u.getId());
-	
 						        // clear the permission
 								disableSecurityAdvisor();
 							}
@@ -4795,6 +4798,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 	private void zipAttachments(ZipOutputStream out, String submittersName, String sSubAttachmentFolder, List attachments) {
 		int attachedUrlCount = 0;
 		InputStream content = null;
+		HashMap<String, Integer> done = new HashMap<String, Integer> ();
 		for (int j = 0; j < attachments.size(); j++)
 		{
 			Reference r = (Reference) attachments.get(j);
@@ -4822,7 +4826,18 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 				{
 					bContent = new BufferedInputStream(content, data.length);
 					
-					ZipEntry attachmentEntry = new ZipEntry(sSubAttachmentFolder + displayName);
+					String candidateName = sSubAttachmentFolder + displayName;
+					String realName = null;
+					Integer already = done.get(candidateName);
+					if (already == null) {
+					    realName = candidateName;
+					    done.put(candidateName, 1);
+					} else {
+					    realName = candidateName + "+" + already;
+					    done.put(candidateName, already + 1);
+					}
+
+					ZipEntry attachmentEntry = new ZipEntry(realName);
 					out.putNextEntry(attachmentEntry);
 					int bCount = -1;
 					while ((bCount = bContent.read(data, 0, data.length)) != -1) 
@@ -4876,7 +4891,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			catch (IOException e)
 			{
 				M_log.warn(" zipAttachments--IOException: Problem in creating the attachment file: submittersName="
-								+ submittersName + " attachment reference=" + r);
+								+ submittersName + " attachment reference=" + r + " error " + e);
 			}
 			catch (ServerOverloadException e)
 			{
@@ -5232,7 +5247,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 
 				// check SECURE_ALL_GROUPS - if not, check if the assignment has groups or not
 				// TODO: the last param needs to be a ContextService.getRef(ref.getContext())... or a ref.getContextAuthzGroup() -ggolden
-				if ((userId == null) || ((!SecurityService.isSuperUser(userId)) && (!AuthzGroupService.isAllowed(userId, SECURE_ALL_GROUPS, SiteService.siteReference(ref.getContext())))))
+				if ((userId == null) || ((!SecurityService.isSuperUser(userId)) && (!SecurityService.unlock(userId, SECURE_ALL_GROUPS, SiteService.siteReference(ref.getContext())))))
 				{
 					// get the channel to get the message to get group information
 					// TODO: check for efficiency, cache and thread local caching usage -ggolden
@@ -6116,32 +6131,25 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			// return true if resubmission is allowed and current time is before resubmission close time
 			// get the resubmit settings from submission object first
 			String allowResubmitNumString = submission != null?submission.getProperties().getProperty(AssignmentSubmission.ALLOW_RESUBMIT_NUMBER):null;
-			if (allowResubmitNumString != null)
+			if (allowResubmitNumString != null  && submission.getTimeSubmitted() != null)
 			{
 				try
 				{
 					int allowResubmitNumber = Integer.parseInt(allowResubmitNumString);
 					String allowResubmitCloseTime = submission != null ? (String) submission.getProperties().getProperty(AssignmentSubmission.ALLOW_RESUBMIT_CLOSETIME):null;
 					Time resubmitCloseTime = null;
-					if (allowResubmitNumber == -1)
+					
+					if (allowResubmitCloseTime != null)
 					{
-						// unlimitted resubmission
-						return true;
+						// see if a resubmission close time is set on submission level
+						resubmitCloseTime = TimeService.newTime(Long.parseLong(allowResubmitCloseTime));
 					}
-					else if (allowResubmitNumber > 0)
+					else
 					{
-						if (allowResubmitCloseTime != null)
-						{
-							// see if a resubmission close time is set on submission level
-							resubmitCloseTime = TimeService.newTime(Long.parseLong(allowResubmitCloseTime));
-						}
-						else
-						{
-							// otherwise, use assignment close time as the resubmission close time
-							resubmitCloseTime = a.getCloseTime();
-						}
-						return allowResubmitNumber != 0 && resubmitCloseTime != null && currentTime.before(resubmitCloseTime);
+						// otherwise, use assignment close time as the resubmission close time
+						resubmitCloseTime = a.getCloseTime();
 					}
+					return (allowResubmitNumber > 0 /* additional submission number allowed */ || allowResubmitNumber == -1 /* unlimited submission times allowed */) && resubmitCloseTime != null && currentTime.before(resubmitCloseTime);
 				}
 				catch (NumberFormatException e)
 				{
@@ -6413,7 +6421,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 							m_context = attributes.getValue("context");
 							try
 							{
-								m_position_order = Long.valueOf(attributes.getValue("position_order")).intValue();
+								m_position_order = NumberUtils.toInt(attributes.getValue("position_order"));
 							}
 							catch (Exception e)
 							{

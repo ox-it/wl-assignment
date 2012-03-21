@@ -801,6 +801,10 @@ public class AssignmentAction extends PagedResourceActionII
 		boolean allowUpdateSite = SiteService.allowUpdateSite((String) state.getAttribute(STATE_CONTEXT_STRING));
 		context.put("allowUpdateSite", Boolean.valueOf(allowUpdateSite));
 		
+		//group related settings
+		context.put("siteAccess", Assignment.AssignmentAccess.SITE);
+		context.put("groupAccess", Assignment.AssignmentAccess.GROUPED);
+		
 		// allow all.groups?
 		boolean allowAllGroups = AssignmentService.allowAllGroups(contextString);
 		context.put("allowAllGroups", Boolean.valueOf(allowAllGroups));
@@ -2791,7 +2795,9 @@ public class AssignmentAction extends PagedResourceActionII
 		String downloadUrl = (String) state.getAttribute(STATE_DOWNLOAD_URL);
 		if (downloadUrl != null)
 		{
-			context.put("download_url_reminder", rb.getFormattedMessage("download_url_reminder", new Object[]{downloadUrl}));
+			context.put("download_url_reminder", rb.getString("download_url_reminder"));
+			context.put("download_url_link", downloadUrl);
+			context.put("download_url_link_label", rb.getString("download_url_link_label"));
 			state.removeAttribute(STATE_DOWNLOAD_URL);
 		}
 		
@@ -8415,12 +8421,12 @@ public class AssignmentAction extends PagedResourceActionII
 		
 		if (state.getAttribute(NEW_ASSIGNMENT_YEAR_RANGE_FROM) == null)
 		{
-			state.setAttribute(NEW_ASSIGNMENT_YEAR_RANGE_FROM, Integer.valueOf(2002));
+			state.setAttribute(NEW_ASSIGNMENT_YEAR_RANGE_FROM, Integer.valueOf(GregorianCalendar.getInstance().get(GregorianCalendar.YEAR)-4));
 		}
 		
 		if (state.getAttribute(NEW_ASSIGNMENT_YEAR_RANGE_TO) == null)
 		{
-			state.setAttribute(NEW_ASSIGNMENT_YEAR_RANGE_TO, Integer.valueOf(2012));
+			state.setAttribute(NEW_ASSIGNMENT_YEAR_RANGE_TO, Integer.valueOf(GregorianCalendar.getInstance().get(GregorianCalendar.YEAR)+4));
 		}
 	} // initState
 
@@ -12610,8 +12616,13 @@ public class AssignmentAction extends PagedResourceActionII
 		try {
 			Site site = SiteService.getSite(siteId);
 			ToolConfiguration tc=site.getToolForCommonId(ASSIGNMENT_TOOL_ID);
-			tc.getPlacementConfig().setProperty(SUBMISSIONS_SEARCH_ONLY, Boolean.toString(submissionsSearchOnly));
-			SiteService.save(site);
+			String currentSetting = tc.getPlacementConfig().getProperty(SUBMISSIONS_SEARCH_ONLY);
+			if (currentSetting != null && !currentSetting.equals(Boolean.toString(submissionsSearchOnly)))
+			{
+				// save the change
+				tc.getPlacementConfig().setProperty(SUBMISSIONS_SEARCH_ONLY, Boolean.toString(submissionsSearchOnly));
+				SiteService.save(site);
+			}
 		}
 		catch (IdUnusedException e)
 		{
