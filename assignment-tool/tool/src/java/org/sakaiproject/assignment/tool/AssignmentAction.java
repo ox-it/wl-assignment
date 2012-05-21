@@ -4532,7 +4532,7 @@ public class AssignmentAction extends PagedResourceActionII
 		
 		if (Boolean.TRUE.toString().equals(b)
 				&& ((Integer) state.getAttribute(NEW_ASSIGNMENT_SUBMISSION_TYPE)).intValue()
-					!= Assignment.ATTACHMENT_ONLY_ASSIGNMENT_SUBMISSION)
+					!= Assignment.SINGLE_ATTACHMENT_SUBMISSION)
 		{
 			addAlert(state, rb.getString("gen.cr.submit"));
 		}
