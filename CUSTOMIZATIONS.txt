@@ -4,3 +4,4 @@ SAK-21613 A1 TII student submission page shows error when its waiting for report
 SAK-21957 Change Assignment TII note from "Attachments only" to "Single upload file only"
 SAK-21520 Impossible to set points using IE9 when creating new assignment
 SAK-21869 Resubmit deadline can override "Accept until" deadline
+SAK-21335 Calendar in Assignments has 2012 as year limit
