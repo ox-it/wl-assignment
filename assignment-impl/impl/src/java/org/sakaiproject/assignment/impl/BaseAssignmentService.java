@@ -25,6 +25,7 @@ import java.io.BufferedInputStream;
 import java.io.InputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -59,6 +60,7 @@ import org.sakaiproject.contentreview.service.ContentReviewService;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.commons.lang.math.NumberUtils;
 import org.apache.poi.hssf.usermodel.HSSFCell;
 import org.apache.poi.hssf.usermodel.HSSFCellStyle;
 import org.apache.poi.hssf.usermodel.HSSFFont;
@@ -2629,7 +2631,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			for (int j = 0; j<attachments.size(); j++)
 			{
 				Reference r = (Reference) attachments.get(j);
-				buffer.append(r.getProperties().getProperty(ResourceProperties.PROP_DISPLAY_NAME) + "(" + r.getProperties().getPropertyFormatted(ResourceProperties.PROP_CONTENT_LENGTH)+ ")\n");
+				buffer.append(r.getProperties().getProperty(ResourceProperties.PROP_DISPLAY_NAME) + " (" + r.getProperties().getPropertyFormatted(ResourceProperties.PROP_CONTENT_LENGTH)+ ")\n");
 				//if this is a archive (zip etc) append the list of files in it
 				if (isArchiveFile(r)) {
 					buffer.append(getArchiveManifest(r));
@@ -3329,7 +3331,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 		if (submission == null) throw new IdUnusedException(submissionId);
 		
 		// double check the submission submitter information:
-		// if current user is not the original submitter and if he doesn't have grading permission, he should have access to other people's submission.
+		// if current user is not the original submitter and if he doesn't have grading permission, he should not have access to other people's submission.
 		String assignmentRef = assignmentReference(submission.getContext(), submission.getAssignmentId());
 		if (!allowGradeSubmission(assignmentRef))
 		{
@@ -3639,7 +3641,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			}
 			
 			// if the user has SECURE_ALL_GROUPS in the context (site), select all site groups
-			if (AuthzGroupService.isAllowed(userId, SECURE_ALL_GROUPS, SiteService.siteReference(context)) && unlockCheck(function, SiteService.siteReference(context)))
+			if (SecurityService.unlock(userId, SECURE_ALL_GROUPS, SiteService.siteReference(context)) && unlockCheck(function, SiteService.siteReference(context)))
 			{
 				return groups;
 			}
@@ -4272,25 +4274,27 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 						        enableSecurityAdvisor();
 						        
 								AssignmentSubmissionEdit s = addSubmission(contextString, a.getId(), u.getId());
-								s.setSubmitted(true);
-								s.setAssignment(a);
-								
-								// set the resubmission properties
-								// get the assignment setting for resubmitting
-								ResourceProperties assignmentProperties = a.getProperties();
-								String assignmentAllowResubmitNumber = assignmentProperties.getProperty(AssignmentSubmission.ALLOW_RESUBMIT_NUMBER);
-								if (assignmentAllowResubmitNumber != null)
+								if (s != null)
 								{
-									s.getPropertiesEdit().addProperty(AssignmentSubmission.ALLOW_RESUBMIT_NUMBER, assignmentAllowResubmitNumber);
+									s.setSubmitted(true);
+									s.setAssignment(a);
 									
-									String assignmentAllowResubmitCloseDate = assignmentProperties.getProperty(AssignmentSubmission.ALLOW_RESUBMIT_CLOSETIME);
-									// if assignment's setting of resubmit close time is null, use assignment close time as the close time for resubmit
-									s.getPropertiesEdit().addProperty(AssignmentSubmission.ALLOW_RESUBMIT_CLOSETIME, assignmentAllowResubmitCloseDate != null?assignmentAllowResubmitCloseDate:String.valueOf(a.getCloseTime().getTime()));
+									// set the resubmission properties
+									// get the assignment setting for resubmitting
+									ResourceProperties assignmentProperties = a.getProperties();
+									String assignmentAllowResubmitNumber = assignmentProperties.getProperty(AssignmentSubmission.ALLOW_RESUBMIT_NUMBER);
+									if (assignmentAllowResubmitNumber != null)
+									{
+										s.getPropertiesEdit().addProperty(AssignmentSubmission.ALLOW_RESUBMIT_NUMBER, assignmentAllowResubmitNumber);
+										
+										String assignmentAllowResubmitCloseDate = assignmentProperties.getProperty(AssignmentSubmission.ALLOW_RESUBMIT_CLOSETIME);
+										// if assignment's setting of resubmit close time is null, use assignment close time as the close time for resubmit
+										s.getPropertiesEdit().addProperty(AssignmentSubmission.ALLOW_RESUBMIT_CLOSETIME, assignmentAllowResubmitCloseDate != null?assignmentAllowResubmitCloseDate:String.valueOf(a.getCloseTime().getTime()));
+									}
+									
+									commitEdit(s);
+									rv.add(u.getId());
 								}
-								
-								commitEdit(s);
-								rv.add(u.getId());
-	
 						        // clear the permission
 								disableSecurityAdvisor();
 							}
@@ -4585,7 +4589,12 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 		}
 
 	} // getSubmissionsZip
-
+	public String escapeInvalidCharsEntry(String accentedString) {
+		String decomposed = Normalizer.normalize(accentedString, Normalizer.Form.NFD);
+		String cleanString = decomposed.replaceAll("\\p{InCombiningDiacriticalMarks}+", "");
+		return cleanString;
+	}
+	
 	protected void zipSubmissions(String assignmentReference, String assignmentTitle, String gradeTypeString, int typeOfSubmission, Iterator submissions, OutputStream outputStream, StringBuilder exceptionMessage, boolean withStudentSubmissionText, boolean withStudentSubmissionAttachment, boolean withGradeFile, boolean withFeedbackText, boolean withFeedbackComment, boolean withFeedbackAttachment) 
 	{
 	    ZipOutputStream out = null;
@@ -4593,7 +4602,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			out = new ZipOutputStream(outputStream);
 
 			// create the folder structure - named after the assignment's title
-			String root = Validator.escapeZipEntry(assignmentTitle) + Entity.SEPARATOR;
+			String root = escapeInvalidCharsEntry(Validator.escapeZipEntry(assignmentTitle)) + Entity.SEPARATOR;
 
 			String submittedText = "";
 			if (!submissions.hasNext())
@@ -4644,7 +4653,16 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 								}
 								submittersString = submittersString.concat(fullName);
 								// add the eid to the end of it to guarantee folder name uniqness
-								submittersString = submittersString + "(" + submitters[i].getEid() + ")";
+								// if user Eid contains non ascii characters, the user internal id will be used
+								String userEid = submitters[i].getEid();
+								String candidateEid = escapeInvalidCharsEntry(userEid);
+								if (candidateEid.equals(userEid)){
+									submittersString = submittersString + "(" + candidateEid + ")";
+								} else{ 	
+									submittersString = submittersString + "(" + submitters[i].getId() + ")";
+								}
+								submittersString = escapeInvalidCharsEntry(submittersString);
+								// in grades file, Eid is used
 								gradesBuffer.append(submitters[i].getDisplayId() + "," + submitters[i].getEid() + "," + fullName + "," + s.getGradeDisplay() + "\n");
 							}
 							
@@ -4701,6 +4719,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 									{
 										// create a attachment folder for the submission attachments
 										String sSubAttachmentFolder = submittersName + rb.getString("stuviewsubm.submissatt") + "/";
+										sSubAttachmentFolder = escapeInvalidCharsEntry(sSubAttachmentFolder);
 										ZipEntry sSubAttachmentFolderEntry = new ZipEntry(sSubAttachmentFolder);
 										out.putNextEntry(sSubAttachmentFolderEntry);
 										// add all submission attachment into the submission attachment folder
@@ -4724,6 +4743,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 								{
 									// create an attachment folder for the feedback attachments
 									String feedbackSubAttachmentFolder = submittersName + rb.getString("download.feedback.attachment") + "/";
+									feedbackSubAttachmentFolder = escapeInvalidCharsEntry(feedbackSubAttachmentFolder);
 									ZipEntry feedbackSubAttachmentFolderEntry = new ZipEntry(feedbackSubAttachmentFolder);
 									out.putNextEntry(feedbackSubAttachmentFolderEntry);
 									// add all feedback attachment folder
@@ -4788,6 +4808,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 	private void zipAttachments(ZipOutputStream out, String submittersName, String sSubAttachmentFolder, List attachments) {
 		int attachedUrlCount = 0;
 		InputStream content = null;
+		HashMap<String, Integer> done = new HashMap<String, Integer> ();
 		for (int j = 0; j < attachments.size(); j++)
 		{
 			Reference r = (Reference) attachments.get(j);
@@ -4799,6 +4820,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 				
 				ResourceProperties props = r.getProperties();
 				String displayName = props.getPropertyFormatted(props.getNamePropDisplayName());
+				displayName = escapeInvalidCharsEntry(displayName);
 
 				// for URL content type, encode a redirect to the body URL
 				if (contentType.equalsIgnoreCase(ResourceProperties.TYPE_URL))
@@ -4815,7 +4837,18 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 				{
 					bContent = new BufferedInputStream(content, data.length);
 					
-					ZipEntry attachmentEntry = new ZipEntry(sSubAttachmentFolder + displayName);
+					String candidateName = sSubAttachmentFolder + displayName;
+					String realName = null;
+					Integer already = done.get(candidateName);
+					if (already == null) {
+					    realName = candidateName;
+					    done.put(candidateName, 1);
+					} else {
+					    realName = candidateName + "+" + already;
+					    done.put(candidateName, already + 1);
+					}
+
+					ZipEntry attachmentEntry = new ZipEntry(realName);
 					out.putNextEntry(attachmentEntry);
 					int bCount = -1;
 					while ((bCount = bContent.read(data, 0, data.length)) != -1) 
@@ -4869,7 +4902,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			catch (IOException e)
 			{
 				M_log.warn(" zipAttachments--IOException: Problem in creating the attachment file: submittersName="
-								+ submittersName + " attachment reference=" + r);
+								+ submittersName + " attachment reference=" + r + " error " + e);
 			}
 			catch (ServerOverloadException e)
 			{
@@ -5225,7 +5258,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 
 				// check SECURE_ALL_GROUPS - if not, check if the assignment has groups or not
 				// TODO: the last param needs to be a ContextService.getRef(ref.getContext())... or a ref.getContextAuthzGroup() -ggolden
-				if ((userId == null) || ((!SecurityService.isSuperUser(userId)) && (!AuthzGroupService.isAllowed(userId, SECURE_ALL_GROUPS, SiteService.siteReference(ref.getContext())))))
+				if ((userId == null) || ((!SecurityService.isSuperUser(userId)) && (!SecurityService.unlock(userId, SECURE_ALL_GROUPS, SiteService.siteReference(ref.getContext())))))
 				{
 					// get the channel to get the message to get group information
 					// TODO: check for efficiency, cache and thread local caching usage -ggolden
@@ -6400,7 +6433,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 							m_context = attributes.getValue("context");
 							try
 							{
-								m_position_order = Long.valueOf(attributes.getValue("position_order")).intValue();
+								m_position_order = NumberUtils.toInt(attributes.getValue("position_order"));
 							}
 							catch (Exception e)
 							{
