@@ -5,3 +5,4 @@ SAK-21957 Change Assignment TII note from "Attachments only" to "Single upload f
 SAK-21520 Impossible to set points using IE9 when creating new assignment
 SAK-21869 Resubmit deadline can override "Accept until" deadline
 SAK-21335 Calendar in Assignments has 2012 as year limit
+SAK-21101 Entity Broker links take you to assignment, even if that assignment is not yet available.
