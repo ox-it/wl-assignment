@@ -8736,16 +8736,6 @@ public class AssignmentAction extends PagedResourceActionII
 		state.setAttribute(ALLOW_RESUBMIT_CLOSEMIN, Integer.valueOf(0));
 		state.setAttribute(ALLOW_RESUBMIT_CLOSEAMPM, "PM");
 		state.setAttribute(AssignmentSubmission.ALLOW_RESUBMIT_NUMBER, Integer.valueOf(1));
-
-		// enable the close date by default
-		state.setAttribute(NEW_ASSIGNMENT_ENABLECLOSEDATE, Boolean.valueOf(true));
-		// set the close time to be 5:00 pm, same as the due time by default
-		state.setAttribute(NEW_ASSIGNMENT_CLOSEMONTH, Integer.valueOf(month));
-		state.setAttribute(NEW_ASSIGNMENT_CLOSEDAY, Integer.valueOf(day));
-		state.setAttribute(NEW_ASSIGNMENT_CLOSEYEAR, Integer.valueOf(year));
-		state.setAttribute(NEW_ASSIGNMENT_CLOSEHOUR, Integer.valueOf(5));
-		state.setAttribute(NEW_ASSIGNMENT_CLOSEMIN, Integer.valueOf(0));
-		state.setAttribute(NEW_ASSIGNMENT_CLOSEAMPM, "PM");
 		
 		// set the all purpose retract time
 		state.setAttribute(ALLPURPOSE_RETRACT_MONTH, Integer.valueOf(month));
@@ -8754,6 +8744,23 @@ public class AssignmentAction extends PagedResourceActionII
 		state.setAttribute(ALLPURPOSE_RETRACT_HOUR, Integer.valueOf(5));
 		state.setAttribute(ALLPURPOSE_RETRACT_MIN, Integer.valueOf(0));
 		state.setAttribute(ALLPURPOSE_RETRACT_AMPM, "PM");
+
+        // Close date is shifted forward by one day after the due day
+        t.setTime(t.getTime() + 24 * 60 * 60 * 1000);
+        tB = t.breakdownLocal();
+        month = tB.getMonth();
+        day = tB.getDay();
+        year = tB.getYear();
+
+        // enable the close date by default
+        state.setAttribute(NEW_ASSIGNMENT_ENABLECLOSEDATE, true);
+        // set the close time to be 5:00 pm, same as the due time by default
+        state.setAttribute(NEW_ASSIGNMENT_CLOSEMONTH, month);
+        state.setAttribute(NEW_ASSIGNMENT_CLOSEDAY, day);
+        state.setAttribute(NEW_ASSIGNMENT_CLOSEYEAR, year);
+        state.setAttribute(NEW_ASSIGNMENT_CLOSEHOUR, 5);
+        state.setAttribute(NEW_ASSIGNMENT_CLOSEMIN, 0);
+        state.setAttribute(NEW_ASSIGNMENT_CLOSEAMPM, "PM");
 
 		state.setAttribute(NEW_ASSIGNMENT_SECTION, "001");
 		state.setAttribute(NEW_ASSIGNMENT_SUBMISSION_TYPE, Integer.valueOf(Assignment.SINGLE_ATTACHMENT_SUBMISSION));
