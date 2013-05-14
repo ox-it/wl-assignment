@@ -4641,7 +4641,13 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			
 			// the buffer used to store grade information
 			StringBuilder gradesBuffer = new StringBuilder(assignmentTitle + "," + gradeTypeString + "\n\n");
-			gradesBuffer.append(rb.getString("grades.id") + "," + rb.getString("grades.eid") + "," + rb.getString("grades.lastname") + "," + rb.getString("grades.firstname") + "," + rb.getString("grades.grade") + "\n");
+			gradesBuffer.append(rb.getString("grades.id")).append(",")
+						.append(rb.getString("grades.eid")).append(",")
+						.append(rb.getString("grades.lastname")).append(",")
+						.append(rb.getString("grades.firstname")).append(",")
+						.append(rb.getString("grades.grade")).append(",")
+						.append(rb.getString("grades.submissionTime")).append(",")
+						.append(rb.getString("grades.late")).append("\n");
 
 			// allow add assignment members
 			List allowAddSubmissionUsers = allowAddSubmissionUsers(assignmentReference);
@@ -4692,7 +4698,22 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 								}
 								submittersString = escapeInvalidCharsEntry(submittersString);
 								// in grades file, Eid is used
-								gradesBuffer.append(submitters[i].getDisplayId() + "," + submitters[i].getEid() + "," + fullName + "," + s.getGradeDisplay() + "\n");
+								gradesBuffer.append(submitters[i].getDisplayId()).append(",")
+											.append(submitters[i].getEid()).append(",")
+											.append(fullName).append(",")
+											.append(s.getTimeSubmittedString()).append(",")
+											.append(s.getGradeDisplay()).append(",");
+								Time dueTime = s.getAssignment().getDueTime();
+								Time submittedTime = s.getTimeSubmitted();
+								String latenessStatus;
+								if (submittedTime == null) {
+									latenessStatus = "";
+								} else if(dueTime != null && submittedTime.after(dueTime)) {
+									latenessStatus = rb.getString("grades.lateness.late");
+								} else {
+									latenessStatus = rb.getString("grades.lateness.ontime");
+								}
+								gradesBuffer.append(latenessStatus).append("\n");
 							}
 							
 							if (StringUtils.trimToNull(submittersString) != null)
