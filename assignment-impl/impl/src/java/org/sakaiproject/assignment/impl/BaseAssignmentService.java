@@ -4706,10 +4706,13 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 								Time dueTime = s.getAssignment().getDueTime();
 								Time submittedTime = s.getTimeSubmitted();
 								String latenessStatus;
-								if (submittedTime == null)
+								if (submittedTime == null) {
 									latenessStatus = "";
-								else
-									latenessStatus = Boolean.valueOf(dueTime != null && submittedTime.after(dueTime)).toString();
+								} else if(dueTime != null && submittedTime.after(dueTime)) {
+									latenessStatus = rb.getString("grades.lateness.late");
+								} else {
+									latenessStatus = rb.getString("grades.lateness.ontime");
+								}
 								gradesBuffer.append(latenessStatus).append("\n");
 							}
 							
