@@ -5338,7 +5338,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			//Blank line was in original gradefile
 			values = new String[] {""};
 			gradesBuffer.writeNext(values);
-			values = new String[] {rb.getString("grades.id"),rb.getString("grades.eid"),rb.getString("grades.lastname"),rb.getString("grades.firstname"),rb.getString("grades.grade")};
+			values = new String[] {rb.getString("grades.id"),rb.getString("grades.eid"),rb.getString("grades.lastname"),rb.getString("grades.firstname"),rb.getString("grades.grade"),rb.getString("grades.submissionTime"),rb.getString("grades.late")};
 			gradesBuffer.writeNext(values);
 
 			// allow add assignment members
@@ -5389,8 +5389,18 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 									submittersString = submittersString + "(" + submitters[i].getId() + ")";
 								}
 								submittersString = escapeInvalidCharsEntry(submittersString);
+								Time dueTime = s.getAssignment().getDueTime();
+								Time submittedTime = s.getTimeSubmitted();
+								String latenessStatus;
+								if (submittedTime == null) {
+									latenessStatus = "";
+								} else if(dueTime != null && submittedTime.after(dueTime)) {
+									latenessStatus = rb.getString("grades.lateness.late");
+								} else {
+									latenessStatus = rb.getString("grades.lateness.ontime");
+								}
 								// in grades file, Eid is used
-								values = new String [] {submitters[i].getDisplayId(), submitters[i].getEid(), submitters[i].getLastName(), submitters[i].getFirstName(), s.getGradeDisplay()};
+								values = new String [] {submitters[i].getDisplayId(), submitters[i].getEid(), submitters[i].getLastName(), submitters[i].getFirstName(), s.getGradeDisplay(), s.getTimeSubmittedString(), latenessStatus};
 								gradesBuffer.writeNext(values);
 							}
 							
