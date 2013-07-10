@@ -4701,8 +4701,8 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 								gradesBuffer.append(submitters[i].getDisplayId()).append(",")
 											.append(submitters[i].getEid()).append(",")
 											.append(fullName).append(",")
-											.append(s.getTimeSubmittedString()).append(",")
-											.append(s.getGradeDisplay()).append(",");
+											.append(s.getGradeDisplay()).append(",")
+											.append(s.getTimeSubmittedString()).append(",");
 								Time dueTime = s.getAssignment().getDueTime();
 								Time submittedTime = s.getTimeSubmitted();
 								String latenessStatus;
