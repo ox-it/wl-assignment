@@ -1814,14 +1814,14 @@ public class AssignmentAction extends PagedResourceActionII
 		context.put("value_AllowStudentView", state.getAttribute(NEW_ASSIGNMENT_ALLOW_STUDENT_VIEW) == null ? Boolean.toString(ServerConfigurationService.getBoolean("turnitin.allowStudentView.default", false)) : state.getAttribute(NEW_ASSIGNMENT_ALLOW_STUDENT_VIEW));	
 	
 		List<String> subOptions = getSubmissionRepositoryOptions();
-		String submitRadio = ServerConfigurationService.getString("turnitin.repository.setting.value",null) == null ? "" : ServerConfigurationService.getString("turnitin.repository.setting.value");
+		String submitRadio = ServerConfigurationService.getString("turnitin.repository.setting.value", "");
 		if(state.getAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_SUBMIT_RADIO) != null && subOptions.contains(state.getAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_SUBMIT_RADIO)))
 			submitRadio = state.getAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_SUBMIT_RADIO).toString();		
 		context.put("value_NEW_ASSIGNMENT_REVIEW_SERVICE_SUBMIT_RADIO", submitRadio);
 		context.put("show_NEW_ASSIGNMENT_REVIEW_SERVICE_SUBMIT", subOptions);
 		
 		List<String> reportGenOptions = getReportGenOptions();
-		String reportRadio = ServerConfigurationService.getString("turnitin.report_gen_speed.setting.value", null) == null ? NEW_ASSIGNMENT_REVIEW_SERVICE_REPORT_IMMEDIATELY : ServerConfigurationService.getString("turnitin.report_gen_speed.setting.value");
+		String reportRadio = ServerConfigurationService.getString("turnitin.report_gen_speed.setting.value", NEW_ASSIGNMENT_REVIEW_SERVICE_REPORT_IMMEDIATELY);
 		if(state.getAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_REPORT_RADIO) != null && reportGenOptions.contains(state.getAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_REPORT_RADIO)))
 			reportRadio = state.getAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_REPORT_RADIO).toString();	
 		context.put("value_NEW_ASSIGNMENT_REVIEW_SERVICE_REPORT_RADIO", reportRadio);
