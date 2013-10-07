@@ -616,7 +616,7 @@ $(document).ready(function() {
 				
 					$tlang.getString("content_review.note")
 					
-					$tlang.getString("review.submit.papers.repository")
+					<span class="reqStar">*</span>$tlang.getString("review.submit.papers.repository")
 					<br/>
 					<div class="indnt1">
 						#if($show_NEW_ASSIGNMENT_REVIEW_SERVICE_SUBMIT.contains($name_NEW_ASSIGNMENT_REVIEW_SERVICE_SUBMIT_NONE))
