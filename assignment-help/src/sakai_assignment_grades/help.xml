@@ -85,7 +85,7 @@
    </bean>
    <bean id="assignmentGbMethods" class="org.sakaiproject.component.app.help.model.ResourceBean">
       <property name="docId"><value>avnd</value></property>
-      <property name="name"><value>Link Assignment to the Gradebook</value></property>
+      <property name="name"><value>Link Assignment to the Markbook</value></property>
       <property name="location"><value>/sakai_assignment_grades/avnd.html</value></property>
    </bean>
    
