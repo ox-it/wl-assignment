@@ -8409,6 +8409,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 
 	} // BaseAssignmentEdit
 
+
 	/**********************************************************************************************************************************************************************************************************************************************************
 	 * AssignmentContent Implementation
 	 *********************************************************************************************************************************************************************************************************************************************************/
@@ -9950,28 +9951,28 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 		// Get new values from review service if defaults
 		public int getReviewScore() {
 			// Code to get updated score if default
-			M_log.debug(this + " getReviewScore for submission " + this.getId() + " and review service is: " + (this.getAssignment().getContent().getAllowReviewService()));
+			M_log.debug(this + " getReviewScore for submission " + getId() + " and review service is: " + (this.getAssignment().getContent().getAllowReviewService()));
 			if (!this.getAssignment().getContent().getAllowReviewService()) {
-				M_log.debug(this + " getReviewScore Content review is not enabled for this assignment");
+				M_log.debug(toString() + " getReviewScore Content review is not enabled for this assignment");
 				return -2;
 			}
 
 			if (m_submittedAttachments.isEmpty()) {
-				M_log.debug(this + " getReviewScore No attachments submitted.");
+				M_log.debug(toString() + " getReviewScore No attachments submitted.");
 				return -2;
 			}
 			else
 			{
 				//we may have already retrived this one
 				if (m_reviewScore != null && m_reviewScore > -1) {
-					M_log.debug("returning stored value of " + m_reviewScore);
+					M_log.debug(toString() + " returning stored value of " + m_reviewScore);
 					return m_reviewScore.intValue();
 				}
 
 				ContentResource cr = getFirstAcceptableAttachement();
 				if (cr == null )
 				{
-					M_log.debug(this + " getReviewScore No suitable attachments found in list");
+					M_log.debug(getId() + " getReviewScore No suitable attachments found in list");
 					return -2;
 				}
 
@@ -9980,17 +9981,17 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 				try {
 					//we need to find the first attachment the CR will accept
 					String contentId = cr.getId();
-					M_log.debug(this + " getReviewScore checking for score for content: " + contentId);
+                    M_log.debug(toString() + " getReviewScore checking for score for content: " + contentId);
 
                     Long status = contentReviewService.getReviewStatus(contentId);
                     if (status != null && (status.equals(ContentReviewItem.NOT_SUBMITTED_CODE) || status.equals(ContentReviewItem.SUBMITTED_AWAITING_REPORT_CODE)))  {
-                        M_log.debug(this + " getReviewStatus returned a status of: " + status);
+                        M_log.debug(toString() + " getReviewStatus returned a status of: " + status);
                         return -2;
                     }
 
 					int score = contentReviewService.getReviewScore(contentId);
 					m_reviewScore = score;
-					M_log.debug(this + " getReviewScore CR returned a score of: " + score);
+					M_log.debug(toString() + " getReviewScore CR returned a score of: " + score);
 					return score;
 						
 				} 
@@ -9998,14 +9999,14 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 					//should we add the item
 					try {
 						
-							M_log.debug(this + " getReviewScore Item is not in queue we will try add it");
+							M_log.debug(toString() + " getReviewScore Item is not in queue we will try add it");
 							String contentId = cr.getId();
 							String userId = this.getSubmitterId();
                                                         try {
 								contentReviewService.queueContent(userId, null, getAssignment().getReference(), contentId);
 							}
 							catch (QueueException qe) {
-								M_log.warn(" getReviewScore Unable to queue content with content review Service: " + qe.getMessage());
+								M_log.warn(toString()+ " getReviewScore Unable to queue content with content review Service: " + qe.getMessage());
 							}
 								
 							
@@ -10017,7 +10018,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 					
 				}
 				catch (Exception e) {
-					M_log.warn(this + " getReviewScore " + e.getMessage());
+					M_log.warn(toString() + " getReviewScore" + e.getMessage());
 					return -1;
 				}
 					
@@ -10029,7 +10030,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 		public String getReviewReport() {
 //			 Code to get updated report if default
 			if (m_submittedAttachments.isEmpty()) { 
-				M_log.debug(this.getId() + " getReviewReport No attachments submitted."); 
+				M_log.debug(toString() + " getReviewReport No attachments submitted.");
 				return "Error";
 			}
 			else
@@ -10038,7 +10039,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 					ContentResource cr = getFirstAcceptableAttachement();
 					if (cr == null )
 					{
-						M_log.debug(this + " getReviewReport No suitable attachments found in list");
+						M_log.debug(toString() + " getReviewReport No suitable attachments found in list");
 						return "error";
 					}
 					
@@ -10050,7 +10051,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 						return contentReviewService.getReviewReportStudent(contentId);
 					
 				} catch (Exception e) {
-					M_log.warn(":getReviewReport() " + e.getMessage());
+					M_log.warn(toString() + "getReviewReport " + e.getMessage());
 					return "Error";
 				}
 					
@@ -11721,6 +11722,11 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 				Assignment a = getAssignment();
 				return a!=null?a.getCloseTime():null;	
 			}
+		}
+
+		@Override
+		public String toString() {
+			return getClass().getName() + " ID: "+ getId();
 		}
 		
 	} // AssignmentSubmission
