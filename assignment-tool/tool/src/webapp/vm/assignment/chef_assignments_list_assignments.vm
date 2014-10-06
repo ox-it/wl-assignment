@@ -4,6 +4,9 @@
 ## Assignments - list view
 #parse("/vm/assignment/assignment_macros.vm")
 <link href="/sakai-assignment-tool/css/assignment.css" type="text/css" rel="stylesheet" media="all" />
+<script type="text/javascript" src="/library/js/jquery-ui-latest/js/jquery.min.js"></script>
+<script type="text/javascript" src="/sakai-assignment-tool/js/assignments.js"></script>
+
 <script type="text/javascript">
   focus_path = ["search"];
 </script>
@@ -193,8 +196,8 @@ function allowClick(object)
 							#end 
 						</a>
 					</th>
-					#if ($!groups && $!allowGradeSubmission)
-						##only show it when there is at least a group in site
+                                        
+					#if ($!allowGradeSubmission)
 						<th id="$tlang.getString('gen.visible')">
 							#if (!$sortedBy.equalsIgnoreCase("$tlang.getString('gen.visible')"))
 								<a href="#" onclick="location='#toolLinkParam("$action" "doSort" "criteria=for")'; return false;"   title="$tlang.getString('gen.sortbyfor')">$tlang.getString("gen.visible")</a>
@@ -294,6 +297,7 @@ function allowClick(object)
 				</tr>
 				#set ($assignmentCount = 0)
 				#foreach ($assignment in $assignments)
+                                        #set ($assignmentContent = $assignment.getContent())
 					#set ($assignmentReference = $assignment.Reference)
 					#set($assignmentProperties=$!assignment.getProperties())
 					## all allow function results
@@ -312,7 +316,7 @@ function allowClick(object)
 						#set ($assignmentCount = $assignmentCount + 1)
 						<tr> 
 							<td headers="attachments" class="attach">
-								#set ($attachments = $assignment.getContent().getAttachments())
+								#set ($attachments = $assignmentContent.getAttachments())
 								#set ($size = 0)
 								#set ($props = false)
 								#if (!$!attachments.isEmpty())
@@ -344,7 +348,7 @@ function allowClick(object)
 											#end
 												$validator.escapeHtml($validator.limit($!assignment.getTitle(), 64))
 												
-											#if ($assignment.getContent().getAllowReviewService())
+											#if ($assignmentContent.getAllowReviewService())
 												<img alt="$reviewIndicator" title="$reviewIndicator" src="/library/image/silk/rosette.png" />
 											#end
 											</a>
@@ -369,7 +373,7 @@ function allowClick(object)
 												#end
 											#end
 											#if (!$assignment.draft && $!service.allowGradeSubmission($assignment.getReference()))#if($prevAction) | #end
-											#set ($gradeScale = $assignment.getContent().getTypeOfGrade())
+											#set ($gradeScale = $assignmentContent.getTypeOfGrade())
 											## show "view submissions" link for ungraded type of assignment
 												<a href="#" onclick="if(allowClick(this)){window.location='#toolLinkParam("$action" "doGrade_assignment" "assignmentId=$validator.escapeUrl($assignmentReference)")';}" >#if ($withGrade && $gradeScale != 1)$!tlang.getString("gen.assign.gra")#else$!tlang.getString("viewsubmissions")#end <span class="skip">: $validator.escapeHtml($validator.limit($!assignment.getTitle(), 64))</span></a>#end										
 										</div>
@@ -488,34 +492,46 @@ function allowClick(object)
 										#end
 									#end
 							</td>
-							#if ($!groups && $!allowGradeSubmission)
-							<td  style="padding-bottom:0">
-								## only show it when there is at least one group
-								## assignment range
-								#set($for="")
-								#if ($assignment.Access.toString().equals("site"))
-									##site assignment
-									#set($for=$tlang.getString("range.allgroups"))
-								#else
-									#set($count=1)
-									#foreach ($group in $assignment.Groups)
-										## found the associated group
-										#set($groupFound=false)
-										#set($groupFound=$!site.getGroup($group))
-										#if ($count>1)
-											#set($for=$for.concat(", "))
+						#if ($!allowGradeSubmission)
+							<td style="padding-bottom:0" headers="for">
+								#set( $groupTitleList = [] )
+								#set( $siteRelease = $assignment.Access.toString().equals("site") )
+								#if( !$siteRelease )
+									#foreach( $groupID in $assignment.Groups )
+										#set( $group = $!site.getGroup( $groupID ) )
+										#if( $!group )
+											#set( $success = $groupTitleList.add( $validator.escapeHtml( $group.Title ) ) )
+											#set( $group = false )
 										#end
-										#if($!groupFound)
-											#set($for= $for.concat($groupFound.Title))
-										#else
-											#set($for= $for.concat($group))
-										#end
-										#set($count=$count+1)
 									#end
 								#end
-								<span title="$validator.escapeHtml($!for)" alt="$validator.escapeHtml($!for)">
-								$validator.escapeHtml($validator.limit($!for, 40))
-								</span>
+
+								#if( $siteRelease )
+									$tlang.getString("gen.viewallgroupssections")
+								#elseif( $groupTitleList.size() > 0 )
+									<div class="groupsContainer">
+										<h4 class="collapse" onclick="toggleGroups( this ); resizeFrame();">
+											$groupTitleList.size()
+											#if( $groupTitleList.size() == 1 )
+												$tlang.getString( "selected.group" )
+											#else
+												$tlang.getString( "selected.groups" )
+											#end
+										</h4>
+
+										<div id="groupsPanel" style="display: none;">
+											<ul>
+												#foreach( $title in $groupTitleList )
+													<li>$title</li>
+												 #end
+											</ul>
+										</div>
+									</div>
+								#else
+									<div class="alertMessage">
+										$tlang.getString( "assignment.inaccessible" )
+									</div>
+								#end
 							</td>
 							#end
 							<td headers="status">
@@ -538,13 +554,14 @@ function allowClick(object)
 								$!assignment.openTime.toStringLocalFull()
 							</td>
 							<td headers="dueDate">
-							#if ($assignment.getContent().getHideDueDate() != "true" || $!allowUpdateAssignment)
+							#if ($assignmentContent.getHideDueDate() != "true" || $!allowUpdateAssignment)
 
                                 ##Instructors can still see the due date
                                 <span class="highlight">$!assignment.dueTime.toStringLocalFull()</span>
                             #end
 
 							</td>
+
 							#if ($!allowGradeSubmission)
 								#if ($!view.equals('lisofass1'))
 								#if ($!showNumSubmissionColumn)
@@ -554,7 +571,7 @@ function allowClick(object)
 									## 1- text only; 2-attachment only; 3-text and attachment; 4-Non-electronic
 									#set($ungradedNumber = $!service.getUngradedSubmissionsCount($assignment.Reference))
 									#set($totalNumber = $!service.getSubmittedSubmissionsCount($assignment.Reference))
-									#set ( $submissionType = $assignment.Content.TypeOfSubmission)
+									#set ( $submissionType = $assignmentContent.TypeOfSubmission)
 									#if ($!submissionType == 4)
 										## non-electronic assignment
 										#set ($allowSubmitUsers = $!service.allowAddSubmissionUsers($!assignment.getReference()))
@@ -573,7 +590,7 @@ function allowClick(object)
 							#end
 							#if ($withGrade && $!allowGradeSubmission)
 							<td headers="maxgrade">
-									#set ($gradeScale = $assignment.getContent().getTypeOfGrade())
+									#set ($gradeScale = $assignmentContent.getTypeOfGrade())
 									#if ($gradeScale == -1)
 										## Grade type not set 
 										$tlang.getString("gen.notset")
@@ -585,7 +602,7 @@ function allowClick(object)
 										A-F
 									#elseif ($gradeScale == 3)
 										## Score based grade type
-										0-$assignment.getContent().getMaxGradePointDisplay()
+										0-$assignmentContent.getMaxGradePointDisplay()
 									#elseif ($gradeScale == 4)
 										## Pass/fail grade type 
 										$tlang.getString("gen.pf")
@@ -767,7 +784,7 @@ function allowClick(object)
 			</table>
 			#if ($!allowRemoveAssignment && $!view.equals('lisofass1'))
 				<p class="act">
-					<input type="submit" class="active" name="eventSubmit_doDelete_confirm_assignment" value="$tlang.getString("update")" accesskey="s" />
+					<input type="submit" class="active" name="eventSubmit_doDelete_confirm_assignment" value="$tlang.getString("removeSelected")" accesskey="s" />
 				</p>
 			#end
 			<input type="hidden" name="sakai_csrf_token" value="$sakai_csrf_token" />
