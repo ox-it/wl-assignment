@@ -8227,7 +8227,7 @@ public class AssignmentAction extends PagedResourceActionII
             contentReviewService.createAssignment(assign.getContext(), assign.getReference(), opts);
         } catch (Exception e) {
             M_log.error(e);
-            String technicalEmail = ServerConfigurationService.getString("feedback.technicalAddress", null);
+            String technicalEmail = ServerConfigurationService.getString("mail.support", null);
             String alertMessage = rb.getFormattedMessage("content_review.error.createAssignment", new Object[]{technicalEmail});
             state.setAttribute("alertMessage", alertMessage);
         }
