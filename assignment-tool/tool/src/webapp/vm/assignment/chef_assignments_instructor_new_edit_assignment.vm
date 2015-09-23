@@ -331,7 +331,7 @@ $(document).ready(function() {
 
 			<script type="text/javascript">
 			      localDatePicker({
-			      	input:'#duedate', 
+			      	input:'#duedate',
 			      	useTime:1, 
 			      	val:"$value_DueYear$H$value_DueMonth$H$value_DueDay $value_DueHour:$value_DueMin",
 			      	parseFormat: 'YYYY-MM-DD HH:mm',
@@ -614,9 +614,9 @@ $(document).ready(function() {
 				#else
 					<div id="reviewServiceOptions" style="display:none" class="indnt3">
 				#end
-				
-					$tlang.getString("content_review.note")
-					
+
+					<div>$contentReviewNote</div>
+
 					<span class="reqStar">*</span>$tlang.getString("review.submit.papers.repository")
 					<br/>
 					<div class="indnt1">

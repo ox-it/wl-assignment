@@ -682,6 +682,7 @@ function submitform(id)
 					</h3>	
 					#if ($assignment.getContent().getAllowReviewService())
 						<p class="instruction"><img alt="$reviewIndicator" title="$reviewIndicator" src="/library/image/silk/rosette.png" /> $reviewIndicator</p>
+						<p class="instruction">$tlang.getString("content_review.filetypes")</p>
 					#end
 					#set ($size = 0)
 					#set ($props = false)

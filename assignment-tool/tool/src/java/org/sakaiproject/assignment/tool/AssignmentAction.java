@@ -924,6 +924,9 @@ public class AssignmentAction extends PagedResourceActionII
 			context.put("reviewServiceName", reviewServiceTitle);
 			context.put("reviewServiceUse", reviewServiceUse);
 			context.put("reviewIndicator", rb.getFormattedMessage("review.contentReviewIndicator", new Object[]{reviewServiceName}));
+			String content_review_note = rb.getFormattedMessage("content_review.note",new Object[]{rb.getFormattedMessage("content_review.filetypes")});
+			context.put("contentReviewNote",content_review_note);
+			context.put("content_review.filetypes",rb.getFormattedMessage("content_review.filetypes"));
 		}
 		
 		//Peer Assessment
@@ -15232,7 +15235,6 @@ public class AssignmentAction extends PagedResourceActionII
 		
 		// construct the state variable for attachment list
 		List attachments = state.getAttribute(ATTACHMENTS) != null? (List) state.getAttribute(ATTACHMENTS) : EntityManager.newReferenceList();
-		
 		FileItem fileitem = null;
 		try
 		{
@@ -15301,7 +15303,10 @@ public class AssignmentAction extends PagedResourceActionII
 						// of further permissions
 						m_securityService.pushAdvisor(sa);
 						ContentResource attachment = m_contentHostingService.addAttachmentResource(resourceId, siteId, "Assignments", contentType, fileContentStream, props);
-						
+						if(!contentReviewService.isAcceptableContent(attachment)) {
+							addAlert(state, rb.getFormattedMessage("turnitin.notprocess.warning"));
+						}
+
 						try
 						{
 							Reference ref = EntityManager.newReference(m_contentHostingService.getReference(attachment.getId()));
