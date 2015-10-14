@@ -924,9 +924,8 @@ public class AssignmentAction extends PagedResourceActionII
 			context.put("reviewServiceName", reviewServiceTitle);
 			context.put("reviewServiceUse", reviewServiceUse);
 			context.put("reviewIndicator", rb.getFormattedMessage("review.contentReviewIndicator", new Object[]{reviewServiceName}));
-			String content_review_note = rb.getFormattedMessage("content_review.note",new Object[]{rb.getFormattedMessage("content_review.filetypes")});
+			String content_review_note = rb.getFormattedMessage("content_review.note",new Object[]{rb.getFormattedMessage("content_review.studentNote")});
 			context.put("contentReviewNote",content_review_note);
-			context.put("content_review.filetypes",rb.getFormattedMessage("content_review.filetypes"));
 		}
 		
 		//Peer Assessment
