@@ -25,6 +25,9 @@
 	</h3>
 	#if ($alertMessage)<div class="alertMessage">$tlang.getString("gen.alert") $alertMessage</div><div class="clear"></div>#end
 		#if ($allowAddAssignment && !$hideAssignmentFlag)
+		<a href="$ltiLink" target="_blank">
+			LINK (just for testing)
+		</a>
 		## show assignment content
 		<p class="discTria">
 			<a href="#" onclick="location='#toolLink("AssignmentAction" "doHide_view_assignment")'; return false;" title="$tlang.getString("gen.hidassinf")">

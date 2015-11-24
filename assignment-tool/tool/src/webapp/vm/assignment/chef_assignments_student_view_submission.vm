@@ -77,6 +77,9 @@ function submitform(id)
 	#end
 	#if ($!canSubmit)
 		#if ($alertMessage)<div class="alertMessage">$tlang.getString("gen.alert") $alertMessage</div><div class="clear"></div>#end
+		<a href="$ltiLink" target="_blank">
+			LINK (just for testing)
+		</a>
 		#if ($!submission && $timeSubmitted)
 			## if there is a submitted submission
 			## get the properies

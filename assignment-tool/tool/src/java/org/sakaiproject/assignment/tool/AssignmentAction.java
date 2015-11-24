@@ -1514,6 +1514,23 @@ public class AssignmentAction extends PagedResourceActionII
 				context.put("student",student);
 			}
 		}
+		
+		//TODO move upwards inside some checking
+		Site site = null;
+		try {
+			site = SiteService.getSite(contextString);
+		}
+		catch (IdUnusedException iue) {
+			M_log.warn(this + ":buildMainPanelContext: Site not found!" + iue.getMessage());
+			return null;
+		}		
+		if (allowReviewService && contentReviewService != null && contentReviewService.isSiteAcceptable(site)) {
+			//put the LTI assignment link in context
+			String ltiLink = contentReviewService.getLTIAccess(currentAssignmentReference, site.getId());
+			M_log.debug("ltiLink " + ltiLink);
+			context.put("ltiLink", ltiLink);
+		}
+		
 		String template = (String) getContext(data).get("template");
 		return template + TEMPLATE_STUDENT_VIEW_SUBMISSION;
 
@@ -3662,6 +3679,22 @@ public class AssignmentAction extends PagedResourceActionII
 		context.put("hideStudentViewFlag", state.getAttribute(VIEW_ASSIGNMENT_HIDE_STUDENT_VIEW_FLAG));
 		context.put("contentTypeImageService", state.getAttribute(STATE_CONTENT_TYPE_IMAGE_SERVICE));
 		context.put("honor_pledge_text", ServerConfigurationService.getString("assignment.honor.pledge", rb.getString("gen.honple2")));
+		
+		//TODO add checkings if assignment uses tii
+		Site s = null;
+		try {
+			s = SiteService.getSite((String) state.getAttribute(STATE_CONTEXT_STRING));
+		}
+		catch (IdUnusedException iue) {
+			M_log.warn(this + ":buildMainPanelContext: Site not found!" + iue.getMessage());
+			return null;
+		}		
+		if (allowReviewService && contentReviewService != null && contentReviewService.isSiteAcceptable(s)) {
+			//put the LTI assignment link in context
+			String ltiLink = contentReviewService.getLTIAccess(assignmentId, s.getId());
+			M_log.debug("ltiLink " + ltiLink);
+			context.put("ltiLink", ltiLink);
+		}
 		
 		String template = (String) getContext(data).get("template");
 		return template + TEMPLATE_INSTRUCTOR_VIEW_ASSIGNMENT;
@@ -8224,7 +8257,12 @@ public class AssignmentAction extends PagedResourceActionII
         dform.applyPattern("yyyy-MM-dd HH:mm:ss");
         opts.put("dtstart", dform.format(openTime.getTime()));
         opts.put("dtdue", dform.format(dueTime.getTime()));
-        //opts.put("dtpost", dform.format(closeTime.getTime()));       
+        //opts.put("dtpost", dform.format(closeTime.getTime()));
+		dform.applyPattern("yyyy-MM-dd'T'HH:mm");
+		opts.put("isostart", dform.format(openTime.getTime()));
+		opts.put("isodue", dform.format(dueTime.getTime()));
+		opts.put("title", assign.getTitle());
+		opts.put("descr", assign.getInstructions());
         try {
             contentReviewService.createAssignment(assign.getContext(), assign.getReference(), opts);
         } catch (Exception e) {
