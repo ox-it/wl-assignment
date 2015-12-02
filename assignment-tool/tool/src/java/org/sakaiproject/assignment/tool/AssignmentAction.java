@@ -1524,11 +1524,15 @@ public class AssignmentAction extends PagedResourceActionII
 			M_log.warn(this + ":buildMainPanelContext: Site not found!" + iue.getMessage());
 			return null;
 		}		
-		if (allowReviewService && contentReviewService != null && contentReviewService.isSiteAcceptable(site)) {
+		if (allowReviewService && contentReviewService != null && contentReviewService.isSiteAcceptable(site) && assignment.getContent().getAllowReviewService()) {
 			//put the LTI assignment link in context
 			String ltiLink = contentReviewService.getLTIAccess(currentAssignmentReference, site.getId());
 			M_log.debug("ltiLink " + ltiLink);
 			context.put("ltiLink", ltiLink);
+			if(ServerConfigurationService.getBoolean("turnitin.direct.access", false)){
+				String templateAux = (String) getContext(data).get("template");
+				return templateAux + "_lti_access";
+			}
 		}
 		
 		String template = (String) getContext(data).get("template");
@@ -3689,7 +3693,7 @@ public class AssignmentAction extends PagedResourceActionII
 			M_log.warn(this + ":buildMainPanelContext: Site not found!" + iue.getMessage());
 			return null;
 		}		
-		if (allowReviewService && contentReviewService != null && contentReviewService.isSiteAcceptable(s)) {
+		if (allowReviewService && contentReviewService != null && contentReviewService.isSiteAcceptable(s) && assignment.getContent().getAllowReviewService()) {
 			//put the LTI assignment link in context
 			String ltiLink = contentReviewService.getLTIAccess(assignmentId, s.getId());
 			M_log.debug("ltiLink " + ltiLink);
