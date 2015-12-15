@@ -219,7 +219,7 @@ public class AssignmentAction extends PagedResourceActionII
 	private static final String NEW_ASSIGNMENT_REVIEW_SERVICE_EXCLUDE_SMALL_MATCHES = "exclude_smallmatches";
 	private static final String NEW_ASSIGNMENT_REVIEW_SERVICE_EXCLUDE_TYPE = "exclude_type";
 	private static final String NEW_ASSIGNMENT_REVIEW_SERVICE_EXCLUDE_VALUE = "exclude_value";
-	
+	private static final String NEW_ASSIGNMENT_REVIEW_SERVICE_ALLOW_ANY_FILE = "journal_check";
 	
 	
 	/** The attachments */
@@ -1385,7 +1385,8 @@ public class AssignmentAction extends PagedResourceActionII
 		if (assignment != null)
 		{
 			context.put("assignment", assignment);
-			context.put("canSubmit", Boolean.valueOf(AssignmentService.canSubmit(contextString, assignment)));
+			boolean canSubmit = AssignmentService.canSubmit(contextString, assignment);
+			context.put("canSubmit", Boolean.valueOf(canSubmit));
 			if (assignment.getContent().getTypeOfSubmission() == Assignment.NON_ELECTRONIC_ASSIGNMENT_SUBMISSION)
 			{
 				context.put("nonElectronicType", Boolean.TRUE);
@@ -1465,6 +1466,20 @@ public class AssignmentAction extends PagedResourceActionII
 
 			// can the student view model answer or not
 			canViewAssignmentIntoContext(context, assignment, s);
+			
+			// add TII info if needed
+			//TODO check allowReviewService value is correct - tii ok and site acceptable
+			if (allowReviewService && assignment.getContent().getAllowReviewService()) {
+				//put the LTI assignment link in context
+				String ltiLink = contentReviewService.getLTIAccess(currentAssignmentReference, contextString);
+				M_log.debug("ltiLink " + ltiLink);
+				context.put("ltiLink", ltiLink);
+				if(ServerConfigurationService.getBoolean("turnitin.direct.access", false) && canSubmit){
+					M_log.debug("Allowing submission directly from TII");
+					String templateAux = (String) getContext(data).get("template");
+					return templateAux + "_lti_access";
+				}
+			}
 		}
 
 		TaggingManager taggingManager = (TaggingManager) ComponentManager
@@ -1512,26 +1527,6 @@ public class AssignmentAction extends PagedResourceActionII
 				// we want to come back to the instructor view page
 				state.setAttribute(FROM_VIEW, MODE_INSTRUCTOR_VIEW_STUDENTS_ASSIGNMENT);
 				context.put("student",student);
-			}
-		}
-		
-		//TODO move upwards inside some checking
-		Site site = null;
-		try {
-			site = SiteService.getSite(contextString);
-		}
-		catch (IdUnusedException iue) {
-			M_log.warn(this + ":buildMainPanelContext: Site not found!" + iue.getMessage());
-			return null;
-		}		
-		if (allowReviewService && contentReviewService != null && contentReviewService.isSiteAcceptable(site) && assignment.getContent().getAllowReviewService()) {
-			//put the LTI assignment link in context
-			String ltiLink = contentReviewService.getLTIAccess(currentAssignmentReference, site.getId());
-			M_log.debug("ltiLink " + ltiLink);
-			context.put("ltiLink", ltiLink);
-			if(ServerConfigurationService.getBoolean("turnitin.direct.access", false)){
-				String templateAux = (String) getContext(data).get("template");
-				return templateAux + "_lti_access";
 			}
 		}
 		
@@ -2238,7 +2233,7 @@ public class AssignmentAction extends PagedResourceActionII
 		context.put("name_NEW_ASSIGNMENT_REVIEW_SERVICE_EXCLUDE_SMALL_MATCHES", NEW_ASSIGNMENT_REVIEW_SERVICE_EXCLUDE_SMALL_MATCHES);
 		context.put("name_NEW_ASSIGNMENT_REVIEW_SERVICE_EXCLUDE_TYPE", NEW_ASSIGNMENT_REVIEW_SERVICE_EXCLUDE_TYPE);
 		context.put("name_NEW_ASSIGNMENT_REVIEW_SERVICE_EXCLUDE_VALUE", NEW_ASSIGNMENT_REVIEW_SERVICE_EXCLUDE_VALUE);
-		
+		context.put("name_NEW_ASSIGNMENT_REVIEW_SERVICE_ALLOW_ANY_FILE", NEW_ASSIGNMENT_REVIEW_SERVICE_ALLOW_ANY_FILE);
 		
 		context.put("name_title", NEW_ASSIGNMENT_TITLE);
 		context.put("name_order", NEW_ASSIGNMENT_ORDER);
@@ -2346,7 +2341,8 @@ public class AssignmentAction extends PagedResourceActionII
 		context.put("value_NEW_ASSIGNMENT_REVIEW_SERVICE_CHECK_INTERNET", state.getAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_CHECK_INTERNET) == null ? Boolean.toString(ServerConfigurationService.getBoolean("turnitin.option.internet_check.default", ServerConfigurationService.getBoolean("turnitin.option.internet_check", true) ? true : false)) : state.getAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_CHECK_INTERNET));
 		context.put("value_NEW_ASSIGNMENT_REVIEW_SERVICE_CHECK_PUB", state.getAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_CHECK_PUB) == null ? Boolean.toString(ServerConfigurationService.getBoolean("turnitin.option.journal_check.default", ServerConfigurationService.getBoolean("turnitin.option.journal_check", true) ? true : false)) : state.getAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_CHECK_PUB));
 		context.put("value_NEW_ASSIGNMENT_REVIEW_SERVICE_CHECK_INSTITUTION", state.getAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_CHECK_INSTITUTION) == null ? Boolean.toString(ServerConfigurationService.getBoolean("turnitin.option.institution_check.default", ServerConfigurationService.getBoolean("turnitin.option.institution_check", true) ? true : false)) : state.getAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_CHECK_INSTITUTION));
-
+		context.put("value_NEW_ASSIGNMENT_REVIEW_SERVICE_ALLOW_ANY_FILE", state.getAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_ALLOW_ANY_FILE) == null ? Boolean.toString(ServerConfigurationService.getBoolean("turnitin.option.any_file.default", false)) : state.getAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_ALLOW_ANY_FILE));
+		
 		//exclude bibliographic materials
 		context.put("show_NEW_ASSIGNMENT_REVIEW_SERVICE_EXCLUDE_BIBLIOGRAPHIC", ServerConfigurationService.getBoolean("turnitin.option.exclude_bibliographic", true));
 		context.put("value_NEW_ASSIGNMENT_REVIEW_SERVICE_EXCLUDE_BIBLIOGRAPHIC", (state.getAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_EXCLUDE_BIBLIOGRAPHIC) == null) ? Boolean.toString(ServerConfigurationService.getBoolean("turnitin.option.exclude_bibliographic.default", ServerConfigurationService.getBoolean("turnitin.option.exclude_bibliographic", true) ? true : false)) : state.getAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_EXCLUDE_BIBLIOGRAPHIC));
@@ -3684,18 +3680,11 @@ public class AssignmentAction extends PagedResourceActionII
 		context.put("contentTypeImageService", state.getAttribute(STATE_CONTENT_TYPE_IMAGE_SERVICE));
 		context.put("honor_pledge_text", ServerConfigurationService.getString("assignment.honor.pledge", rb.getString("gen.honple2")));
 		
-		//TODO add checkings if assignment uses tii
-		Site s = null;
-		try {
-			s = SiteService.getSite((String) state.getAttribute(STATE_CONTEXT_STRING));
-		}
-		catch (IdUnusedException iue) {
-			M_log.warn(this + ":buildMainPanelContext: Site not found!" + iue.getMessage());
-			return null;
-		}		
-		if (allowReviewService && contentReviewService != null && contentReviewService.isSiteAcceptable(s) && assignment.getContent().getAllowReviewService()) {
+		//TODO add checkings if assignment uses tii	
+		if (allowReviewService && assignment.getContent().getAllowReviewService()) {
+			String contextString = (String) state.getAttribute(STATE_CONTEXT_STRING);
 			//put the LTI assignment link in context
-			String ltiLink = contentReviewService.getLTIAccess(assignmentId, s.getId());
+			String ltiLink = contentReviewService.getLTIAccess(assignmentId, contextString);
 			M_log.debug("ltiLink " + ltiLink);
 			context.put("ltiLink", ltiLink);
 		}
@@ -6158,6 +6147,12 @@ public class AssignmentAction extends PagedResourceActionII
 		else b = Boolean.TRUE.toString();
 		state.setAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_EXCLUDE_SMALL_MATCHES, b);
 		
+		//allow any type
+		r = params.getString(NEW_ASSIGNMENT_REVIEW_SERVICE_ALLOW_ANY_FILE);
+		if (r == null) b = Boolean.FALSE.toString();
+		else b = Boolean.TRUE.toString();
+		state.setAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_ALLOW_ANY_FILE, b);
+		
 		//exclude type:
 		//only options are 0=none, 1=words, 2=percentages
 		r = params.getString(NEW_ASSIGNMENT_REVIEW_SERVICE_EXCLUDE_TYPE);
@@ -7045,6 +7040,7 @@ public class AssignmentAction extends PagedResourceActionII
 			boolean checkInternet = "true".equalsIgnoreCase((String) state.getAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_CHECK_INTERNET));
 			boolean checkPublications = "true".equalsIgnoreCase((String) state.getAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_CHECK_PUB));
 			boolean checkInstitution = "true".equalsIgnoreCase((String) state.getAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_CHECK_INSTITUTION));
+			boolean allowAnyFile = "true".equalsIgnoreCase((String) state.getAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_ALLOW_ANY_FILE));
 			//exclude bibliographic materials
 			boolean excludeBibliographic = "true".equalsIgnoreCase((String) state.getAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_EXCLUDE_BIBLIOGRAPHIC));
 			//exclude quoted materials
@@ -7125,7 +7121,7 @@ public class AssignmentAction extends PagedResourceActionII
 				oldCloseTime = a.getCloseTime();
 
 				// commit the changes to AssignmentContent object
-				commitAssignmentContentEdit(state, ac, title, submissionType,useReviewService,allowStudentViewReport, gradeType, gradePoints, description, checkAddHonorPledge, attachments, submitReviewRepo, generateOriginalityReport, checkTurnitin, checkInternet, checkPublications, checkInstitution, excludeBibliographic, excludeQuoted, excludeType, excludeValue, openTime, dueTime, closeTime, hideDueDate);
+				commitAssignmentContentEdit(state, ac, title, submissionType,useReviewService,allowStudentViewReport, gradeType, gradePoints, description, checkAddHonorPledge, attachments, submitReviewRepo, generateOriginalityReport, checkTurnitin, checkInternet, checkPublications, checkInstitution, excludeBibliographic, excludeQuoted, excludeType, excludeValue, allowAnyFile, openTime, dueTime, closeTime, hideDueDate);
 				
 				// set the Assignment Properties object
 				ResourcePropertiesEdit aPropertiesEdit = a.getPropertiesEdit();
@@ -8163,7 +8159,7 @@ public class AssignmentAction extends PagedResourceActionII
 		}
 	}
 
-	private void commitAssignmentContentEdit(SessionState state, AssignmentContentEdit ac, String title, int submissionType,boolean useReviewService, boolean allowStudentViewReport, int gradeType, String gradePoints, String description, String checkAddHonorPledge, List attachments, String submitReviewRepo, String generateOriginalityReport, boolean checkTurnitin, boolean checkInternet, boolean checkPublications, boolean checkInstitution, boolean excludeBibliographic, boolean excludeQuoted, int excludeType, int excludeValue, Time openTime, Time dueTime, Time closeTime, boolean hideDueDate) 
+	private void commitAssignmentContentEdit(SessionState state, AssignmentContentEdit ac, String title, int submissionType,boolean useReviewService, boolean allowStudentViewReport, int gradeType, String gradePoints, String description, String checkAddHonorPledge, List attachments, String submitReviewRepo, String generateOriginalityReport, boolean checkTurnitin, boolean checkInternet, boolean checkPublications, boolean checkInstitution, boolean excludeBibliographic, boolean excludeQuoted, int excludeType, int excludeValue, boolean allowAnyFile, Time openTime, Time dueTime, Time closeTime, boolean hideDueDate) 
 	{
 		ac.setTitle(title);
 		ac.setInstructions(description);
@@ -8182,6 +8178,7 @@ public class AssignmentAction extends PagedResourceActionII
 		ac.setExcludeQuoted(excludeQuoted);
 		ac.setExcludeType(excludeType);
 		ac.setExcludeValue(excludeValue);
+		ac.setAllowAnyFile(allowAnyFile);
 		ac.setTypeOfGrade(gradeType);
 		if (gradeType == 3)
 		{
@@ -8239,8 +8236,9 @@ public class AssignmentAction extends PagedResourceActionII
         opts.put("institution_check", assign.isCheckInstitution() ? "1" : "0");
         opts.put("internet_check", assign.isCheckInternet() ? "1" : "0");
         opts.put("journal_check", assign.isCheckPublications() ? "1" : "0");
-        opts.put("s_paper_check", assign.isCheckTurnitin() ? "1" : "0");        
-        opts.put("s_view_report", assign.getAllowStudentViewReport() ? "1" : "0");        
+        opts.put("s_paper_check", assign.isCheckTurnitin() ? "1" : "0");
+        opts.put("s_view_report", assign.getAllowStudentViewReport() ? "1" : "0");
+		opts.put("allow_any_file", assign.isAllowAnyFile() ? "1" : "0");
         if(ServerConfigurationService.getBoolean("turnitin.option.exclude_bibliographic", true)){
 			//we don't want to pass parameters if the user didn't get an option to set it
         	opts.put("exclude_biblio", assign.isExcludeBibliographic() ? "1" : "0");
@@ -8255,7 +8253,12 @@ public class AssignmentAction extends PagedResourceActionII
         	opts.put("exclude_type", Integer.toString(assign.getExcludeType()));
         	opts.put("exclude_value", Integer.toString(assign.getExcludeValue()));
         }
-        opts.put("late_accept_flag", "1");
+		
+        if(closeTime.getTime() > dueTime.getTime()){
+			opts.put("late_accept_flag", "1");
+		} else {
+			opts.put("late_accept_flag", "0");
+		}
         
         SimpleDateFormat dform = ((SimpleDateFormat) DateFormat.getDateInstance());
         dform.applyPattern("yyyy-MM-dd HH:mm:ss");
@@ -8267,6 +8270,7 @@ public class AssignmentAction extends PagedResourceActionII
 		opts.put("isodue", dform.format(dueTime.getTime()));
 		opts.put("title", assign.getTitle());
 		opts.put("descr", assign.getInstructions());
+		opts.put("points", assign.getMaxGradePointDisplay());
         try {
             contentReviewService.createAssignment(assign.getContext(), assign.getReference(), opts);
         } catch (Exception e) {
@@ -8749,6 +8753,7 @@ public class AssignmentAction extends PagedResourceActionII
 				state.setAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_CHECK_INTERNET, Boolean.valueOf(a.getContent().isCheckInternet()).toString());
 				state.setAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_CHECK_PUB, Boolean.valueOf(a.getContent().isCheckPublications()).toString());
 				state.setAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_CHECK_INSTITUTION, Boolean.valueOf(a.getContent().isCheckInstitution()).toString());
+				state.setAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_ALLOW_ANY_FILE, Boolean.valueOf(a.getContent().isAllowAnyFile()).toString());
 				//exclude bibliographic
 				state.setAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_EXCLUDE_BIBLIOGRAPHIC, Boolean.valueOf(a.getContent().isExcludeBibliographic()).toString());
 				//exclude quoted

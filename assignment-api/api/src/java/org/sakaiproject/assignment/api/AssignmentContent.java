@@ -220,6 +220,10 @@ public interface AssignmentContent extends Entity, AttachmentContainer
 
 	public void setExcludeQuoted(boolean m_excludeQuoted);
 	
+	public boolean isAllowAnyFile();
+
+	public void setAllowAnyFile(boolean m_allowAnyFile);
+	
 	/**
 	 * Exclude type options:
 	 * 0 none

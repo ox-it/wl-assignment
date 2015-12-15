@@ -24,6 +24,7 @@ package org.sakaiproject.assignment.impl;
 import au.com.bytecode.opencsv.CSVWriter;
 
 import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.math.NumberUtils;
 import org.apache.commons.logging.Log;
@@ -76,6 +77,7 @@ import org.sakaiproject.time.api.Time;
 import org.sakaiproject.time.cover.TimeService;
 import org.sakaiproject.tool.api.SessionBindingEvent;
 import org.sakaiproject.tool.api.SessionBindingListener;
+import org.sakaiproject.tool.api.Session;
 import org.sakaiproject.tool.cover.SessionManager;
 import org.sakaiproject.tool.cover.ToolManager;
 import org.sakaiproject.user.api.User;
@@ -97,6 +99,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.*;
 import java.text.Normalizer;
 import java.text.NumberFormat;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.zip.ZipEntry;
@@ -5819,6 +5822,360 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 		return true;
 	}
 
+	//TODO all that follows was taken from BaseContentService, removed and changed code, should be revised
+	protected static final int STREAM_BUFFER_SIZE = 102400;
+	protected static final String SECURE_INLINE_HTML = "content.html.forcedownload";
+	public static final String RFC1123_DATE = "EEE, dd MMM yyyy HH:mm:ss zzz";
+	public static final Locale LOCALE_US = Locale.US;
+	
+	protected void handleAccessResource(HttpServletRequest req, HttpServletResponse res, ContentResource resource){
+
+		// Set some headers to tell browsers to revalidate and check for updated files
+		res.addHeader("Cache-Control", "must-revalidate, private");
+		res.addHeader("Expires", "-1");
+		try
+		{
+			long len = resource.getContentLength();
+			String contentType = resource.getContentType();
+			ResourceProperties rp = resource.getProperties();
+			long lastModTime = 0;
+
+			try {
+				Time modTime = rp.getTimeProperty(ResourceProperties.PROP_MODIFIED_DATE);
+				lastModTime = modTime.getTime();
+			} catch (Exception e1) {
+				M_log.info("Could not retrieve modified time for: " + resource.getId());
+			}
+			
+			// KNL-1316 tell the browser when our file was last modified for caching reasons
+			if (lastModTime > 0) {
+				SimpleDateFormat rfc1123Date = new SimpleDateFormat(RFC1123_DATE, LOCALE_US);
+				rfc1123Date.setTimeZone(TimeZone.getTimeZone("GMT"));
+				res.addHeader("Last-Modified", rfc1123Date.format(lastModTime));
+			}
+
+			// for url content type, encode a redirect to the body URL
+			if (contentType.equalsIgnoreCase(ResourceProperties.TYPE_URL))
+			{	
+				M_log.warn("REMOVED CODE (url type) - SHOULD NOT ENTER HERE");
+			} else
+			{
+				// use the last part, the file name part of the id, for the download file name
+				//		String fileName = Web.encodeFileName( req, Validator.getFileName(ref.getId()) );
+				String fileName = Web.encodeFileName( req, rp.getProperty(rp.getNamePropDisplayName()) );
+				M_log.debug("fileName " + fileName);
+
+				String disposition = null;
+				if (Validator.letBrowserInline(contentType))
+				{
+					// if this is an html file we have more checks
+				    String lcct = contentType.toLowerCase();
+				    if ( ( lcct.startsWith("text/") || lcct.startsWith("image/") 
+				            || lcct.contains("html") || lcct.contains("script") ) && 
+				            m_serverConfigurationService.getBoolean(SECURE_INLINE_HTML, true)) {
+				        // increased checks to handle more mime-types - https://jira.sakaiproject.org/browse/KNL-749
+
+						boolean fileInline = false;
+						boolean folderInline = false;
+
+						try {
+							fileInline = rp.getBooleanProperty(ResourceProperties.PROP_ALLOW_INLINE);
+						}
+						catch (EntityPropertyNotDefinedException e) {
+							// we expect this so nothing to do!
+						}
+
+						if (!fileInline) 
+						try
+						{
+							folderInline = resource.getContainingCollection().getProperties().getBooleanProperty(ResourceProperties.PROP_ALLOW_INLINE);
+						}
+						catch (EntityPropertyNotDefinedException e) {
+							// we expect this so nothing to do!
+						}		
+						
+						if (fileInline || folderInline) {
+							disposition = "inline; filename=\"" + fileName + "\"";
+						}
+					} else {
+						disposition = "inline; filename=\"" + fileName + "\"";
+					}
+				}
+				
+				// drop through to attachment
+				if (disposition == null)
+				{
+					disposition = "attachment; filename=\"" + fileName + "\"";
+				}
+
+				// NOTE: Only set the encoding on the content we have to.
+				// Files uploaded by the user may have been created with different encodings, such as ISO-8859-1;
+				// rather than (sometimes wrongly) saying its UTF-8, let the browser auto-detect the encoding.
+				// If the content was created through the WYSIWYG editor, the encoding does need to be set (UTF-8).
+				String encoding = resource.getProperties().getProperty(ResourceProperties.PROP_CONTENT_ENCODING);
+				if (encoding != null && encoding.length() > 0)
+				{
+					contentType = contentType + "; charset=" + encoding;
+				}
+				
+				// KNL-1316 let's see if the user already has a cached copy. Code copied and modified from Tomcat DefaultServlet.java
+				long headerValue = req.getDateHeader("If-Modified-Since");
+				if (headerValue != -1 && (lastModTime < headerValue + 1000)) {
+					// The entity has not been modified since the date specified by the client. This is not an error case.
+					res.setStatus(HttpServletResponse.SC_NOT_MODIFIED);
+					return; 
+				}
+
+				ArrayList<Range> ranges = parseRange(req, res, len);
+				res.addHeader("Accept-Ranges", "bytes");
+
+		        if (req.getHeader("Range") == null || (ranges == null) || (ranges.isEmpty())) {
+		        	
+					// stream the content using a small buffer to keep memory managed
+					InputStream content = null;
+					OutputStream out = null;
+	
+					try
+					{
+						content = resource.streamContent();
+						if (content == null)
+						{
+							//throw new IdUnusedException(ref.getReference());
+							M_log.warn("NULL CONTENT - SHOULD NOT ENTER HERE");
+							return;
+						}
+	
+						res.setContentType(contentType);
+						res.addHeader("Content-Disposition", disposition);
+						// http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=4187336
+ 						if (len <= Integer.MAX_VALUE){
+ 							res.setContentLength((int)len);
+ 						} else {
+ 							res.addHeader("Content-Length", Long.toString(len));
+ 						}
+
+						// set the buffer of the response to match what we are reading from the request
+						if (len < STREAM_BUFFER_SIZE)
+						{
+							res.setBufferSize((int)len);
+						}
+						else
+						{
+							res.setBufferSize(STREAM_BUFFER_SIZE);
+						}
+	
+						out = res.getOutputStream();
+	
+						copyRange(content, out, 0, len-1);
+					}
+					catch (ServerOverloadException e)
+					{
+						throw e;
+					}
+					catch (Exception ignore)
+					{
+					}
+					finally
+					{
+						// be a good little program and close the stream - freeing up valuable system resources
+						if (content != null)
+						{
+							content.close();
+						}
+	
+						if (out != null)
+						{
+							try
+							{
+								out.close();
+							}
+							catch (Exception ignore)
+							{
+							}
+						}
+					}
+					
+					// Track event - only for full reads
+					//TODO eventTrackingService.post(eventTrackingService.newEvent(EVENT_RESOURCE_READ, resource.getReference(null), false));
+
+		        } else {
+					M_log.warn("REMOVED CODE (ranges) - SHOULD NOT ENTER HERE");
+		        } // output partial content 
+
+			} // output resource
+
+		}
+		catch (Exception t)
+		{
+			M_log.error("Exception handling content " + t.getMessage());
+		}
+	}
+	
+	protected ArrayList<Range> parseRange(HttpServletRequest request,
+                                HttpServletResponse response,
+                                long fileLength)
+        throws IOException {
+    	
+        if (fileLength == 0)
+            return null;
+
+        // Retrieving the range header (if any is specified
+        String rangeHeader = request.getHeader("Range");
+
+        if (rangeHeader == null)
+            return null;
+        // bytes is the only range unit supported (and I don't see the point
+        // of adding new ones).
+        if (!rangeHeader.startsWith("bytes")) {
+            response.addHeader("Content-Range", "bytes */" + fileLength);
+            response.sendError
+                (HttpServletResponse.SC_REQUESTED_RANGE_NOT_SATISFIABLE);
+            return null;
+        }
+
+        rangeHeader = rangeHeader.substring(6);
+
+        // Vector which will contain all the ranges which are successfully
+        // parsed.
+        ArrayList result = new ArrayList();
+        StringTokenizer commaTokenizer = new StringTokenizer(rangeHeader, ",");
+
+        // Parsing the range list
+        while (commaTokenizer.hasMoreTokens()) {
+            String rangeDefinition = commaTokenizer.nextToken().trim();
+
+            Range currentRange = new Range();
+            currentRange.length = fileLength;
+
+            int dashPos = rangeDefinition.indexOf('-');
+
+            if (dashPos == -1) {
+                response.addHeader("Content-Range", "bytes */" + fileLength);
+                response.sendError
+                    (HttpServletResponse.SC_REQUESTED_RANGE_NOT_SATISFIABLE);
+                return null;
+            }
+
+            if (dashPos == 0) {
+
+                try {
+                    long offset = Long.parseLong(rangeDefinition);
+                    currentRange.start = fileLength + offset;
+                    currentRange.end = fileLength - 1;
+                } catch (NumberFormatException e) {
+                    response.addHeader("Content-Range",
+                                       "bytes */" + fileLength);
+                    response.sendError
+                        (HttpServletResponse
+                         .SC_REQUESTED_RANGE_NOT_SATISFIABLE);
+                    return null;
+                }
+
+            } else {
+
+                try {
+                    currentRange.start = Long.parseLong
+                        (rangeDefinition.substring(0, dashPos));
+                    if (dashPos < rangeDefinition.length() - 1)
+                        currentRange.end = Long.parseLong
+                            (rangeDefinition.substring
+                             (dashPos + 1, rangeDefinition.length()));
+                    else
+                        currentRange.end = fileLength - 1;
+                } catch (NumberFormatException e) {
+                    response.addHeader("Content-Range",
+                                       "bytes */" + fileLength);
+                    response.sendError
+                        (HttpServletResponse
+                         .SC_REQUESTED_RANGE_NOT_SATISFIABLE);
+                    return null;
+                }
+
+            }
+
+            if (!currentRange.validate()) {
+                response.addHeader("Content-Range", "bytes */" + fileLength);
+                response.sendError
+                    (HttpServletResponse.SC_REQUESTED_RANGE_NOT_SATISFIABLE);
+                return null;
+            }
+
+            result.add(currentRange);
+        }
+
+        return result;
+    }
+
+    /**
+     * Copy the partial contents of the specified input stream to the specified
+     * output stream.
+     * 
+     * @param istream The input stream to read from
+     * @param ostream The output stream to write to
+     * @param start Start of the range which will be copied
+     * @param end End of the range which will be copied
+     * @return Exception which occurred during processing
+     */
+    protected IOException copyRange(InputStream istream,
+                                  OutputStream ostream,
+                                  long start, long end) {
+
+    	try {
+            istream.skip(start);
+        } catch (IOException e) {
+            return e;
+        }
+
+        IOException exception = null;
+        long bytesToRead = end - start + 1;
+
+        byte buffer[] = new byte[STREAM_BUFFER_SIZE];
+        int len = buffer.length;
+        while ( (bytesToRead > 0) && (len >= buffer.length)) {
+            try {
+                len = istream.read(buffer);
+                if (bytesToRead >= len) {
+                    ostream.write(buffer, 0, len);
+                    bytesToRead -= len;
+                } else {
+                    ostream.write(buffer, 0, (int) bytesToRead);
+                    bytesToRead = 0;
+                }
+            } catch (IOException e) {
+                exception = e;
+                len = -1;
+            }
+            if (len < buffer.length)
+                break;
+        }
+
+        return exception;
+    }
+
+	protected class Range {
+
+        public long start;
+        public long end;
+        public long length;
+
+        /**
+         * Validate range.
+         */
+        public boolean validate() {
+            if (end >= length)
+                end = length - 1;
+            return ( (start >= 0) && (end >= 0) && (start <= end)
+                     && (length > 0) );
+        }
+
+        public void recycle() {
+            start = 0;
+            end = 0;
+            length = 0;
+        }
+
+    }
+	
 	/**
 	 * {@inheritDoc}
 	 */
@@ -5830,9 +6187,70 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 					Collection copyrightAcceptedRefs) throws EntityPermissionException, EntityNotDefinedException,
 					EntityAccessOverloadException, EntityCopyrightException
 			{
+				M_log.debug("handleAccess from getHttpAccess ");
+				M_log.debug("ref " + ref.getId() + " - " + ref.getSubType() + " - " + ref.getReference() + " - " + ref.getContainer());
 				if (SessionManager.getCurrentSessionUserId() == null)
 				{
-					// fail the request, user not logged in yet.
+					M_log.debug("user not logged in");
+					try{
+						if ("s".equals(ref.getSubType()))
+						{
+							M_log.debug("getting submission");
+							//TODO should we check the assignment settings?
+							Session newsession = SessionManager.startSession();
+							newsession.setActive();
+							SessionManager.setCurrentSession(newsession);
+							newsession.setUserId("admin");
+							newsession.setUserEid("admin");
+							if (newsession == null){
+								M_log.debug("startSession() failed.");
+							} else {
+								M_log.debug(newsession.getId());
+							}
+							AssignmentSubmission s = getSubmission(ref.getId());
+							if(s==null)
+								M_log.debug("null submission");
+							else {
+								M_log.debug("submission url " + s.getUrl());
+								if (s.getSubmittedAttachments().isEmpty())
+									M_log.debug(this + " getReviewScore No attachments submitted.");
+								else {
+									Reference ref2 = (Reference)s.getSubmittedAttachments().get(0);
+									ContentResource cr = (ContentResource)ref2.getEntity();
+									if(cr==null)
+										M_log.debug("null ContentResource");
+									else {
+										ContentReviewItem cri = contentReviewService.getItemBySubmissionId(s.getId());
+										if(cri == null){
+											M_log.debug("cri nulllll");
+											return;
+										} else {
+											M_log.debug("cri " + cri.getId() + " - " + cri.getContentId());
+										}
+										
+										if(cri.isUrlAccessed()){
+											M_log.warn("Trying to access an url already accessed, submission id " + s.getId());
+											return;
+										}
+										
+										handleAccessResource(req, res, cr);
+											
+										boolean itemUpdated = contentReviewService.updateItemAccess(s.getId());
+										if(!itemUpdated)
+											M_log.error("Could not update cr item access status");
+										
+										//TODO close sakai session
+									}
+								}
+							}
+						}
+						// else fail the request, user not logged in yet.
+					}
+					catch (Throwable t)
+					{
+						M_log.warn(" HandleAccess: caught exception " + t.toString() + " and rethrow it!");
+						throw new EntityNotDefinedException(ref.getReference());
+					}
 				}
 				else
 				{
@@ -8488,6 +8906,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 		boolean m_checkInternet = true;
 		boolean m_checkPublications = true;
 		boolean m_checkInstitution = true;
+		boolean m_allowAnyFile = false;
 		boolean m_excludeBibliographic = true;
 		boolean m_excludeQuoted = true;
 		int m_excludeType = 0;
@@ -8565,6 +8984,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			m_checkInternet = getBool(el.getAttribute("checkInternet"));
 			m_checkPublications = getBool(el.getAttribute("checkPublications"));
 			m_checkInstitution = getBool(el.getAttribute("checkInstitution"));
+			m_allowAnyFile = getBool(el.getAttribute("allowAnyFile"));
 			m_excludeBibliographic = getBool(el.getAttribute("excludeBibliographic"));
 			m_excludeQuoted = getBool(el.getAttribute("excludeQuoted"));
 			String excludeTypeStr = el.getAttribute("excludeType");
@@ -8771,6 +9191,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 							m_checkInternet = getBool(attributes.getValue("checkInternet"));
 							m_checkPublications = getBool(attributes.getValue("checkPublications"));
 							m_checkInstitution = getBool(attributes.getValue("checkInstitution"));
+							m_allowAnyFile = getBool(attributes.getValue("allowAnyFile"));
 							m_excludeBibliographic = getBool(attributes.getValue("excludeBibliographic"));
 							m_excludeQuoted = getBool(attributes.getValue("excludeQuoted"));
 							String excludeTypeStr = attributes.getValue("excludeType");
@@ -8946,6 +9367,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			content.setAttribute("checkInternet", getBoolString(m_checkInternet));
 			content.setAttribute("checkPublications", getBoolString(m_checkPublications));
 			content.setAttribute("checkInstitution", getBoolString(m_checkInstitution));
+			content.setAttribute("allowAnyFile", getBoolString(m_allowAnyFile));
 			content.setAttribute("excludeBibliographic", getBoolString(m_excludeBibliographic));
 			content.setAttribute("excludeQuoted", getBoolString(m_excludeQuoted));
 			content.setAttribute("excludeType", Integer.toString(m_excludeType));
@@ -9025,6 +9447,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 				m_checkInternet = content.isCheckInternet();
 				m_checkPublications = content.isCheckPublications();
 				m_checkInstitution = content.isCheckInstitution();
+				m_allowAnyFile = content.isAllowAnyFile();
 				m_excludeBibliographic = content.isExcludeBibliographic();
 				m_excludeQuoted = content.isExcludeQuoted();
 				m_excludeType = content.getExcludeType();
@@ -9507,6 +9930,14 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			this.m_excludeValue = m_excludeValue;
 		}
 
+		public boolean isAllowAnyFile() {
+			return m_allowAnyFile;
+		}
+
+		public void setAllowAnyFile(boolean m_allowAnyFile) {
+			this.m_allowAnyFile = m_allowAnyFile;
+		}
+		
 	}// BaseAssignmentContent
 
 	/**********************************************************************************************************************************************************************************************************************************************************
@@ -9999,7 +10430,8 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 					return m_reviewScore.intValue();
 				}
 
-				ContentResource cr = getFirstAcceptableAttachement();
+				boolean allowAnyFile = this.getAssignment().getContent().isAllowAnyFile();
+				ContentResource cr = getFirstAcceptableAttachement(allowAnyFile);
 				if (cr == null )
 				{
 					M_log.debug(getId() + " getReviewScore No suitable attachments found in list");
@@ -10032,8 +10464,10 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 							M_log.debug(toString() + " getReviewScore Item is not in queue we will try add it");
 							String contentId = cr.getId();
 							String userId = this.getSubmitterId();
-                                                        try {
-								contentReviewService.queueContent(userId, null, getAssignment().getReference(), contentId);
+                            try {
+								//TODO specify api or lti integration
+								//contentReviewService.queueContent(userId, null, getAssignment().getReference(), contentId);
+								contentReviewService.queueContent(userId, null, getAssignment().getReference(), contentId, this.getId());
 							}
 							catch (QueueException qe) {
 								M_log.warn(toString()+ " getReviewScore Unable to queue content with content review Service: " + qe.getMessage());
@@ -10066,7 +10500,8 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			else
 			{
 				try {
-					ContentResource cr = getFirstAcceptableAttachement();
+					boolean allowAnyFile = this.getAssignment().getContent().isAllowAnyFile();
+					ContentResource cr = getFirstAcceptableAttachement(allowAnyFile);
 					if (cr == null )
 					{
 						M_log.debug(toString() + " getReviewReport No suitable attachments found in list");
@@ -10089,13 +10524,13 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			
 		}
 		
-		private ContentResource getFirstAcceptableAttachement() {
+		private ContentResource getFirstAcceptableAttachement(boolean allowAnyFile) {//TODO we might be losing other checkings
 			String contentId = null;
 			try {
 			for( int i =0; i < m_submittedAttachments.size();i++ ) {
 				Reference ref = (Reference)m_submittedAttachments.get(i);
 				ContentResource contentResource = (ContentResource)ref.getEntity();
-				if (contentReviewService.isAcceptableContent(contentResource)) {
+				if (allowAnyFile || contentReviewService.isAcceptableContent(contentResource)) {
 					return (ContentResource)contentResource;
 				}
 			}
@@ -10120,7 +10555,8 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
             else
             {
                 try {
-                    ContentResource cr = getFirstAcceptableAttachement();
+                    boolean allowAnyFile = this.getAssignment().getContent().isAllowAnyFile();
+                    ContentResource cr = getFirstAcceptableAttachement(allowAnyFile);
                     if (cr == null )
                     {
                         M_log.debug(this + " getReviewError No suitable attachments found in list");
@@ -12116,13 +12552,16 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			//Send the attachment to the review service
 
 			try {
-				ContentResource cr = getFirstAcceptableAttachement(attachments);
+				boolean allowAnyFile = this.getAssignment().getContent().isAllowAnyFile();
+				ContentResource cr = getFirstAcceptableAttachement(attachments, allowAnyFile);
 				Assignment ass = this.getAssignment();
 				if (ass != null && cr != null)
 				{
 					if (cr != null)
 					{
-						contentReviewService.queueContent(null, null, ass.getReference(), cr.getId());
+						//TODO specify api or lti integration
+						//contentReviewService.queueContent(null, null, ass.getReference(), cr.getId());
+						contentReviewService.queueContent(null, null, ass.getReference(), cr.getId(), this.getId());
 					}
 					else
 					{
@@ -12143,13 +12582,13 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 
 		}
 
-		private ContentResource getFirstAcceptableAttachement(List attachments) {
+		private ContentResource getFirstAcceptableAttachement(List attachments, boolean allowAnyFile) {//TODO might be losing checkings
 			
 			for( int i =0; i < attachments.size();i++ ) { 
 				Reference attachment = (Reference)attachments.get(i);
 				try {
 					ContentResource res = m_contentHostingService.getResource(attachment.getId());
-					if (contentReviewService.isAcceptableContent(res)) {
+					if (allowAnyFile || contentReviewService.isAcceptableContent(res)) {
 						return res;
 					}
 				} catch (PermissionException e) {

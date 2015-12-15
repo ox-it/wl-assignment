@@ -670,6 +670,17 @@ $(document).ready(function() {
 						</label>
 					</div>
 					<br/>
+					<div class="checkbox">
+						#if ($!value_NEW_ASSIGNMENT_REVIEW_SERVICE_ALLOW_ANY_FILE.equals("true"))			
+							<input id="$name_NEW_ASSIGNMENT_REVIEW_SERVICE_ALLOW_ANY_FILE" name="$name_NEW_ASSIGNMENT_REVIEW_SERVICE_ALLOW_ANY_FILE" type="checkbox" value="true" checked="checked" />
+						#else
+							<input id="$name_NEW_ASSIGNMENT_REVIEW_SERVICE_ALLOW_ANY_FILE" name="$name_NEW_ASSIGNMENT_REVIEW_SERVICE_ALLOW_ANY_FILE" type="checkbox" value="true" />
+						#end
+						<label for="$name_NEW_ASSIGNMENT_REVIEW_SERVICE_ALLOW_ANY_FILE">
+							$tlang.getString("review.originality.allow.any.file") 
+						</label>
+					</div>
+					<br/>
 					#if($show_NEW_ASSIGNMENT_REVIEW_SERVICE_EXCLUDE_BIBLIOGRAPHIC || $show_NEW_ASSIGNMENT_REVIEW_SERVICE_EXCLUDE_QUOTED || $show_NEW_ASSIGNMENT_REVIEW_SERVICE_EXCLUDE_SMALL_MATCHES)
 						$tlang.getString("review.exclude.matches.header")
 						<br/>
