@@ -8270,7 +8270,12 @@ public class AssignmentAction extends PagedResourceActionII
 		opts.put("isodue", dform.format(dueTime.getTime()));
 		opts.put("title", assign.getTitle());
 		opts.put("descr", assign.getInstructions());
-		opts.put("points", assign.getMaxGradePointDisplay());
+		/* TODO on trunk more than one decimal is possible
+		int factor = AssignmentService.getScaleFactor();
+		int dec = (int)Math.log10(factor);
+		int maxPoints = assign.getMaxGradePoint() / dec;*/
+		int maxPoints = assign.getMaxGradePoint() / 10;
+		opts.put("points", maxPoints);
         try {
             contentReviewService.createAssignment(assign.getContext(), assign.getReference(), opts);
         } catch (Exception e) {
