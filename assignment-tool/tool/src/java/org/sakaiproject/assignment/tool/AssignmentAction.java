@@ -3573,6 +3573,17 @@ public class AssignmentAction extends PagedResourceActionII
 		
 		String template = (String) getContext(data).get("template");
 		
+		if (allowReviewService && assignment != null && assignmentContent != null && assignment.getContent().getAllowReviewService()) {
+			String contextString = (String) state.getAttribute(STATE_CONTEXT_STRING);
+			String ltiLink = contentReviewService.getLTIAccess(assignmentRef, contextString);
+			M_log.debug("ltiLink " + ltiLink);
+			context.put("ltiLink", ltiLink);
+			if(ServerConfigurationService.getBoolean("turnitin.direct.access", false)){
+				M_log.debug("Allowing submission directly from TII");
+				return template + "_lti_access";
+			}
+		}
+		
 		return template + TEMPLATE_INSTRUCTOR_GRADE_ASSIGNMENT;
 
 	} // build_instructor_grade_assignment_context
