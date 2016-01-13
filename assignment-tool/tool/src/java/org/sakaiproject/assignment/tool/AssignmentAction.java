@@ -3573,7 +3573,7 @@ public class AssignmentAction extends PagedResourceActionII
 		
 		String template = (String) getContext(data).get("template");
 		
-		if (allowReviewService && assignment != null && assignmentContent != null && assignment.getContent().getAllowReviewService()) {
+		if (allowReviewService && assignment != null && assignment.getContent() != null && assignment.getContent().getAllowReviewService()) {
 			String contextString = (String) state.getAttribute(STATE_CONTEXT_STRING);
 			String ltiLink = contentReviewService.getLTIAccess(assignmentRef, contextString);
 			M_log.debug("ltiLink " + ltiLink);
