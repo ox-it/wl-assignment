@@ -265,4 +265,10 @@ public interface AssignmentSubmissionEdit extends AssignmentSubmission, Edit
 	 * @param attachments
 	 */
 	public void postAttachment(List attachments);
+	
+	/**
+	 * Post resubmission attachments to the content review service
+	 * @param attachments
+	 */
+	public void postAttachmentResub(List attachments);
 }

@@ -209,6 +209,7 @@ public class AssignmentAction extends PagedResourceActionII
     // or 2 - On Due Date
 	private static final String NEW_ASSIGNMENT_REVIEW_SERVICE_REPORT_RADIO = "report_gen_speed";
 	private static final String NEW_ASSIGNMENT_REVIEW_SERVICE_REPORT_IMMEDIATELY = "0";
+	private static final String NEW_ASSIGNMENT_REVIEW_SERVICE_REPORT_IMMEDIATELY_RESUB = "1";
 	private static final String NEW_ASSIGNMENT_REVIEW_SERVICE_REPORT_DUE = "2";
 	private static final String NEW_ASSIGNMENT_REVIEW_SERVICE_CHECK_TURNITIN = "s_paper_check";
 	private static final String NEW_ASSIGNMENT_REVIEW_SERVICE_CHECK_INTERNET = "internet_check";
@@ -1468,17 +1469,22 @@ public class AssignmentAction extends PagedResourceActionII
 			canViewAssignmentIntoContext(context, assignment, s);
 			
 			// add TII info if needed
-			//TODO check allowReviewService value is correct - tii ok and site acceptable
 			if (allowReviewService && assignment.getContent().getAllowReviewService()) {
 				//put the LTI assignment link in context
 				String ltiLink = contentReviewService.getLTIAccess(currentAssignmentReference, contextString);
 				M_log.debug("ltiLink " + ltiLink);
 				context.put("ltiLink", ltiLink);
-				if(ServerConfigurationService.getBoolean("turnitin.direct.access", false) && canSubmit){
-					M_log.debug("Allowing submission directly from TII");
-					String templateAux = (String) getContext(data).get("template");
-					return templateAux + "_lti_access";
-				}
+				Site st = null;
+			    try {
+			        st = SiteService.getSite(contextString);
+					if(contentReviewService.isDirectAccess(st) && canSubmit){
+						M_log.debug("Allowing submission directly from TII");
+						String templateAux = (String) getContext(data).get("template");
+						return templateAux + "_lti_access";
+					}
+				} catch (IdUnusedException iue) {
+			        M_log.warn(this + ":buildStudentViewSubmissionContext: Site not found!" + iue.getMessage());
+			    }
 			}
 		}
 
@@ -3578,9 +3584,15 @@ public class AssignmentAction extends PagedResourceActionII
 			String ltiLink = contentReviewService.getLTIAccess(assignmentRef, contextString);
 			M_log.debug("ltiLink " + ltiLink);
 			context.put("ltiLink", ltiLink);
-			if(ServerConfigurationService.getBoolean("turnitin.direct.access", false)){
-				M_log.debug("Allowing submission directly from TII");
-				return template + "_lti_access";
+			Site st = null;
+			try {
+			    st = SiteService.getSite(contextString);		
+				if(contentReviewService.isDirectAccess(st)){
+					M_log.debug("Allowing submission directly from TII");
+					return template + "_lti_access";
+				}
+			} catch (IdUnusedException iue) {
+				M_log.warn(this + ":build_instructor_grade_assignment_context: Site not found!" + iue.getMessage());
 			}
 		}
 		
@@ -5675,7 +5687,7 @@ public class AssignmentAction extends PagedResourceActionII
 							//Check if we need to post the attachments
 							if (a.getContent().getAllowReviewService()) {
 								if (!attachments.isEmpty()) { 
-									sEdit.postAttachment(attachments);
+									sEdit.postAttachmentResub(attachments);
 								}
 							}
 															 
@@ -7132,7 +7144,7 @@ public class AssignmentAction extends PagedResourceActionII
 				oldCloseTime = a.getCloseTime();
 
 				// commit the changes to AssignmentContent object
-				commitAssignmentContentEdit(state, ac, title, submissionType,useReviewService,allowStudentViewReport, gradeType, gradePoints, description, checkAddHonorPledge, attachments, submitReviewRepo, generateOriginalityReport, checkTurnitin, checkInternet, checkPublications, checkInstitution, excludeBibliographic, excludeQuoted, excludeType, excludeValue, allowAnyFile, openTime, dueTime, closeTime, hideDueDate);
+				commitAssignmentContentEdit(state, ac, title, submissionType,useReviewService,allowStudentViewReport, gradeType, gradePoints, description, checkAddHonorPledge, attachments, submitReviewRepo, generateOriginalityReport, checkTurnitin, checkInternet, checkPublications, checkInstitution, excludeBibliographic, excludeQuoted, excludeType, excludeValue, allowAnyFile, openTime, dueTime, closeTime, hideDueDate, assignmentId);
 				
 				// set the Assignment Properties object
 				ResourcePropertiesEdit aPropertiesEdit = a.getPropertiesEdit();
@@ -8170,7 +8182,7 @@ public class AssignmentAction extends PagedResourceActionII
 		}
 	}
 
-	private void commitAssignmentContentEdit(SessionState state, AssignmentContentEdit ac, String title, int submissionType,boolean useReviewService, boolean allowStudentViewReport, int gradeType, String gradePoints, String description, String checkAddHonorPledge, List attachments, String submitReviewRepo, String generateOriginalityReport, boolean checkTurnitin, boolean checkInternet, boolean checkPublications, boolean checkInstitution, boolean excludeBibliographic, boolean excludeQuoted, int excludeType, int excludeValue, boolean allowAnyFile, Time openTime, Time dueTime, Time closeTime, boolean hideDueDate) 
+	private void commitAssignmentContentEdit(SessionState state, AssignmentContentEdit ac, String title, int submissionType,boolean useReviewService, boolean allowStudentViewReport, int gradeType, String gradePoints, String description, String checkAddHonorPledge, List attachments, String submitReviewRepo, String generateOriginalityReport, boolean checkTurnitin, boolean checkInternet, boolean checkPublications, boolean checkInstitution, boolean excludeBibliographic, boolean excludeQuoted, int excludeType, int excludeValue, boolean allowAnyFile, Time openTime, Time dueTime, Time closeTime, boolean hideDueDate, String assignmentId) 
 	{
 		ac.setTitle(title);
 		ac.setInstructions(description);
@@ -8243,7 +8255,12 @@ public class AssignmentAction extends PagedResourceActionII
         Map opts = new HashMap();
         
         opts.put("submit_papers_to", assign.getSubmitReviewRepo());
-        opts.put("report_gen_speed", assign.getGenerateOriginalityReport());
+        String originalityReportVal = assign.getGenerateOriginalityReport();
+		if(originalityReportVal.equals(NEW_ASSIGNMENT_REVIEW_SERVICE_REPORT_IMMEDIATELY) && state.getAttribute(AssignmentSubmission.ALLOW_RESUBMIT_NUMBER) != null){
+			opts.put("report_gen_speed", NEW_ASSIGNMENT_REVIEW_SERVICE_REPORT_IMMEDIATELY_RESUB);
+		} else {
+			opts.put("report_gen_speed", originalityReportVal);
+		}
         opts.put("institution_check", assign.isCheckInstitution() ? "1" : "0");
         opts.put("internet_check", assign.isCheckInternet() ? "1" : "0");
         opts.put("journal_check", assign.isCheckPublications() ? "1" : "0");

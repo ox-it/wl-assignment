@@ -54,6 +54,7 @@ import org.sakaiproject.contentreview.exception.ReportException;
 import org.sakaiproject.contentreview.exception.SubmissionException;
 import org.sakaiproject.contentreview.model.ContentReviewItem;
 import org.sakaiproject.contentreview.service.ContentReviewService;
+import org.sakaiproject.contentreview.service.ContentReviewSiteAdvisor;
 import org.sakaiproject.email.cover.DigestService;
 import org.sakaiproject.email.cover.EmailService;
 import org.sakaiproject.entity.api.*;
@@ -162,6 +163,11 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 	protected ContentReviewService contentReviewService;
 	public void setContentReviewService(ContentReviewService contentReviewService) {
 		this.contentReviewService = contentReviewService;
+	}
+	
+	protected ContentReviewSiteAdvisor contentReviewSiteAdvisor;
+	public void setContentReviewSiteAdvisor(ContentReviewSiteAdvisor contentReviewSiteAdvisor) {
+		this.contentReviewSiteAdvisor = contentReviewSiteAdvisor;
 	}
 	
 	private AssignmentPeerAssessmentService assignmentPeerAssessmentService = null;
@@ -752,6 +758,10 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
  		if (contentReviewService == null)
  		{
  			contentReviewService = (ContentReviewService) ComponentManager.get(ContentReviewService.class.getName());
+ 		}
+		if (contentReviewSiteAdvisor == null)
+ 		{
+ 			contentReviewSiteAdvisor = (ContentReviewSiteAdvisor) ComponentManager.get(ContentReviewSiteAdvisor.class.getName());
  		}
 	} // init
 
@@ -2504,6 +2514,32 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 		}
 
 	} // commitEdit(Submission)
+	
+	public void commitEditFromCallback(AssignmentSubmissionEdit submission)
+	{
+		String submissionRef = submission.getReference();
+		
+		// check for closed edit
+		if (!submission.isActiveEdit())
+		{
+			try
+			{
+				throw new Exception();
+			}
+			catch (Exception e)
+			{
+				M_log.warn(" commitEditFromCallback(): closed AssignmentSubmissionEdit assignment submission id=" + submission.getId() + e.getMessage());
+			}
+			return;
+		}
+
+		// complete the edit
+		m_submissionStorage.commit(submission);
+		
+		// close the edit object
+		
+		((BaseAssignmentSubmissionEdit) submission).closeEdit();
+	}
 	
 	protected void sendGradeReleaseNotification(boolean released, String notificationSetting, User[] allSubmitters, AssignmentSubmission s)
 	{
@@ -6220,9 +6256,10 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 									if(cr==null)
 										M_log.debug("null ContentResource");
 									else {
-										ContentReviewItem cri = contentReviewService.getItemBySubmissionId(s.getId());
+										M_log.debug("cr " + cr.getId());
+										ContentReviewItem cri = contentReviewService.getItemBySubmissionId(s.getId(), cr.getId());
 										if(cri == null){
-											M_log.debug("cri nulllll");
+											M_log.debug("cri is null");
 											return;
 										} else {
 											M_log.debug("cri " + cri.getId() + " - " + cri.getContentId());
@@ -6235,11 +6272,13 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 										
 										handleAccessResource(req, res, cr);
 											
-										boolean itemUpdated = contentReviewService.updateItemAccess(s.getId());
+										boolean itemUpdated = contentReviewService.updateItemAccess(s.getId(), cr.getId());
 										if(!itemUpdated)
 											M_log.error("Could not update cr item access status");
 										
 										//TODO close sakai session
+										
+										//TODO any of the error cases should modify the cri so it gets processed again
 									}
 								}
 							}
@@ -10510,10 +10549,22 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 					
 					String contentId = cr.getId();
 					
-					if (allowGradeSubmission(getReference()))
-						return contentReviewService.getReviewReportInstructor(contentId);
-					else
-						return contentReviewService.getReviewReportStudent(contentId);
+					try {
+						Site site = SiteService.getSite(m_context);
+						boolean siteCanUseLTIReviewService = contentReviewSiteAdvisor.siteCanUseLTIReviewService(site);
+						if (siteCanUseLTIReviewService) {
+							return contentReviewService.getReviewReport(contentId);							
+						} else {//old TII api
+							if (allowGradeSubmission(getReference())){
+								return contentReviewService.getReviewReportInstructor(contentId);//could use legacy methods
+							} else {
+								return contentReviewService.getReviewReportStudent(contentId);
+							}
+						}
+					} catch (IdUnusedException _iue) {
+						M_log.debug(this + " getReviewReport Could not find site from m_context value " + m_context);
+						return "error";
+					}
 					
 				} catch (Exception e) {
 					M_log.warn(toString() + "getReviewReport " + e.getMessage());
@@ -12580,6 +12631,28 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 				M_log.warn(this + " BaseAssignmentSubmission postAttachment: Failed to post.", e);
 			}
 
+		}
+		
+		public void postAttachmentResub(List attachments){
+			//Send the attachment to the review service
+			try {
+				boolean allowAnyFile = this.getAssignment().getContent().isAllowAnyFile();
+				ContentResource cr = getFirstAcceptableAttachement(attachments, allowAnyFile);
+				Assignment ass = this.getAssignment();
+				if (ass != null && cr != null)
+				{
+					contentReviewService.queueResubContent(null, null, ass.getReference(), cr.getId(), this.getId());//same, could be used same method but
+				}
+				else
+				{
+					// error, assignment couldn't be found. Log the error
+					M_log.debug(this + " BaseAssignmentSubmissionEdit postAttachmentResub: Unable to find assignment associated with submission id= " + this.m_id + " and assignment id=" + this.m_assignment);
+				}
+			} catch (QueueException qe) {
+				M_log.warn(" BaseAssignmentSubmissionEdit postAttachmentResub: Unable to add content to Content Review queue: " + qe.getMessage());
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
 		}
 
 		private ContentResource getFirstAcceptableAttachement(List attachments, boolean allowAnyFile) {//TODO might be losing checkings
