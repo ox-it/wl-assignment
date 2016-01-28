@@ -10444,6 +10444,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 		protected String m_reviewStatus;
 		
 		protected String m_reviewIconUrl;
+		protected String m_reviewIconColor;
 
         protected String m_reviewError;
 		
@@ -10504,8 +10505,6 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 							String contentId = cr.getId();
 							String userId = this.getSubmitterId();
                             try {
-								//TODO specify api or lti integration
-								//contentReviewService.queueContent(userId, null, getAssignment().getReference(), contentId);
 								contentReviewService.queueContent(userId, null, getAssignment().getReference(), contentId, this.getId());
 							}
 							catch (QueueException qe) {
@@ -10553,7 +10552,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 						Site site = SiteService.getSite(m_context);
 						boolean siteCanUseLTIReviewService = contentReviewSiteAdvisor.siteCanUseLTIReviewService(site);
 						if (siteCanUseLTIReviewService) {
-							return contentReviewService.getReviewReport(contentId);							
+							return contentReviewService.getReviewReport(contentId);
 						} else {//old TII api
 							if (allowGradeSubmission(getReference())){
 								return contentReviewService.getReviewReportInstructor(contentId);//could use legacy methods
@@ -10575,13 +10574,13 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			
 		}
 		
-		private ContentResource getFirstAcceptableAttachement(boolean allowAnyFile) {//TODO we might be losing other checkings
+		private ContentResource getFirstAcceptableAttachement(boolean allowAnyFile) {
 			String contentId = null;
 			try {
 			for( int i =0; i < m_submittedAttachments.size();i++ ) {
 				Reference ref = (Reference)m_submittedAttachments.get(i);
 				ContentResource contentResource = (ContentResource)ref.getEntity();
-				if (allowAnyFile || contentReviewService.isAcceptableContent(contentResource)) {
+				if (contentReviewService.isAcceptableSize(contentResource) && (allowAnyFile || contentReviewService.isAcceptableContent(contentResource))){
 					return (ContentResource)contentResource;
 				}
 			}
@@ -10660,6 +10659,13 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 				m_reviewIconUrl = contentReviewService.getIconUrlforScore(Long.valueOf(this.getReviewScore()));
 				
 			return m_reviewIconUrl;
+		}
+		
+		public String getReviewIconColor() {
+			if (m_reviewIconColor == null )
+				m_reviewIconColor = contentReviewService.getIconColorforScore(Long.valueOf(this.getReviewScore()));
+				
+			return m_reviewIconColor;
 		}
 		
 		/**
@@ -12610,8 +12616,6 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 				{
 					if (cr != null)
 					{
-						//TODO specify api or lti integration
-						//contentReviewService.queueContent(null, null, ass.getReference(), cr.getId());
 						contentReviewService.queueContent(null, null, ass.getReference(), cr.getId(), this.getId());
 					}
 					else
@@ -12661,7 +12665,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 				Reference attachment = (Reference)attachments.get(i);
 				try {
 					ContentResource res = m_contentHostingService.getResource(attachment.getId());
-					if (allowAnyFile || contentReviewService.isAcceptableContent(res)) {
+					if (contentReviewService.isAcceptableSize(res) && (allowAnyFile || contentReviewService.isAcceptableContent(res))) {
 						return res;
 					}
 				} catch (PermissionException e) {
@@ -12784,6 +12788,10 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 		public void setReviewIconUrl(String url) {
 			this.m_reviewIconUrl = url;
 			
+		}
+		
+		public void setReviewIconColor(String color) {
+			this.m_reviewIconColor = color;			
 		}
 
 		public void setReviewStatus(String status) {

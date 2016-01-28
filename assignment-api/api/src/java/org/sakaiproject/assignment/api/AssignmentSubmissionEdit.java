@@ -206,6 +206,12 @@ public interface AssignmentSubmissionEdit extends AssignmentSubmission, Edit
 	public void setReviewIconUrl(String url);
 	
 	/**
+	 * Set the color of the Review Report
+	 * @param url
+	 */
+	public void setReviewIconColor(String url);
+	
+	/**
 	 * Set the content review status
 	 * @param status
 	 */

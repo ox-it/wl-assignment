@@ -178,3 +178,11 @@ label.disabled {
     color: #aaa;
 }
 
+.reviewStyle{
+    color: red !important;
+    font-size: 20px !important;
+}
+
+.flagStyle{
+    font-size: 20px !important;
+}

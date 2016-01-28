@@ -1,6 +1,7 @@
 <!-- $Id$ -->
 <!-- start: chef_assignments_instructor_list_submissions.vm  -->
 ##<!-- $Header: /cvs/sakai2/legacy/tools/src/webapp/vm/assignment/chef_assignments_instructor_list_submissions.vm,v 1.10 2005/06/14 16:07:00 zqian.umich.edu Exp $ -->
+<link href="/library/font-awesome/font-awesome-4.4.0/css/font-awesome.min.css" type="text/css" rel="stylesheet" media="all">
 <script type="text/javascript">
     $(document).ready(function(){
         setupToggleAreas('toggleAnchor', 'toggledContent', false, 'fast');
@@ -756,7 +757,7 @@
                                      $tlang.getString("review.noreport")  
 								 #else
 								 <a href="$submission.getReviewReport()" target="_blank" title="View report: score $submission.getReviewScore()">
-								 <img src="$submission.getReviewIconUrl()" alt="$submission.getReviewScore()">
+									<i alt="$submission.getReviewScore()" class="fa fa-flag flagStyle" style="color:$submission.getReviewIconColor() !important"></i>
 								 </a>
 								 #end
 									

@@ -3703,7 +3703,6 @@ public class AssignmentAction extends PagedResourceActionII
 		context.put("contentTypeImageService", state.getAttribute(STATE_CONTENT_TYPE_IMAGE_SERVICE));
 		context.put("honor_pledge_text", ServerConfigurationService.getString("assignment.honor.pledge", rb.getString("gen.honple2")));
 		
-		//TODO add checkings if assignment uses tii	
 		if (allowReviewService && assignment.getContent().getAllowReviewService()) {
 			String contextString = (String) state.getAttribute(STATE_CONTEXT_STRING);
 			//put the LTI assignment link in context
@@ -5627,6 +5626,7 @@ public class AssignmentAction extends PagedResourceActionII
 
 							// clean the ContentReview attributes
 							sEdit.setReviewIconUrl(null);
+							sEdit.setReviewIconColor(null);
 							sEdit.setReviewScore(-2); // the default is -2 (e.g., for a new submission)
 							sEdit.setReviewStatus(null);
 
@@ -8305,6 +8305,7 @@ public class AssignmentAction extends PagedResourceActionII
 		int maxPoints = assign.getMaxGradePoint() / 10;
 		opts.put("points", maxPoints);
         try {
+			state.removeAttribute("alertMessage");
             contentReviewService.createAssignment(assign.getContext(), assign.getReference(), opts);
         } catch (Exception e) {
             M_log.error(e);

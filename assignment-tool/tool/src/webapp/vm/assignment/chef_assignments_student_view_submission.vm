@@ -1,5 +1,6 @@
 <!-- $Id$ -->
 <!-- start: chef_assignments_student_view_submission.vm  -->
+<link href="/library/font-awesome/font-awesome-4.4.0/css/font-awesome.min.css" type="text/css" rel="stylesheet" media="all">
 <script type="text/javascript">
 $(document).ready(function(){
     setupToggleAreas('toggleAnchor', 'toggledContent', false, 'fast');
@@ -306,7 +307,7 @@ function submitform(id)
 							#if ($submission.getReviewReport().equalsIgnoreCase("Error"))
 								<div class="alertMessage" >$!submission.getReviewError()</div>
 							#else
-								<img src="$submission.getReviewIconUrl()" alt="$submission.getReviewScore()">
+								<i alt="$submission.getReviewScore()" class="fa fa-flag reviewStyle" style="color:$submission.getReviewIconColor()"></i>
 							
 								<a href="$submission.getReviewReport()" target="_blank">$tlang.getString("review.viewreport")</a>
 							#end
@@ -684,7 +685,7 @@ function submitform(id)
 						#end
 					</h3>	
 					#if ($assignment.getContent().getAllowReviewService())
-						<p class="instruction"><img alt="$reviewIndicator" title="$reviewIndicator" src="/library/image/silk/rosette.png" /> $reviewIndicator</p>
+						<p class="instruction"><i alt="$reviewIndicator" title="$reviewIndicator" class="fa fa-certificate reviewStyle"></i> $reviewIndicator</p>
 						<p class="instruction">$tlang.getString("content_review.studentNote")</p>
 					#end
 					#set ($size = 0)

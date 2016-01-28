@@ -267,6 +267,12 @@ public interface AssignmentSubmission extends Entity
 	 * @return
 	 */
 	public String getReviewIconUrl();
+	
+	/**
+	 *  the color of the content review Icon associated with this submission
+	 * @return
+	 */
+	public String getReviewIconColor();
 
     /**
      *
