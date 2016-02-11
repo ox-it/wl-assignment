@@ -6243,43 +6243,38 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 							} else {
 								M_log.debug(newsession.getId());
 							}
-							AssignmentSubmission s = getSubmission(ref.getId());
-							if(s==null)
-								M_log.debug("null submission");
-							else {
+							if(!ref.getId().contains(":")){
+								M_log.debug("No content review item specified");
+								return;
+							}
+							String[] ids = ref.getId().split(":");
+							String submissionId = ids[0];
+							String criId = ids[1];
+							AssignmentSubmission s = getSubmission(submissionId);
+							ContentReviewItem cri = contentReviewService.getItemById(criId);
+							M_log.debug("cri " + criId + " - content " + cri.getContentId());
+							ContentResource cr = m_contentHostingService.getResource(cri.getContentId());
+							if(s == null || cr == null || cri == null){
+								M_log.warn("Could not get submission, content or contentreviewitem " + ref.getId());
+								return;
+							} else {
 								M_log.debug("submission url " + s.getUrl());
 								if (s.getSubmittedAttachments().isEmpty())
 									M_log.debug(this + " getReviewScore No attachments submitted.");
 								else {
-									Reference ref2 = (Reference)s.getSubmittedAttachments().get(0);
-									ContentResource cr = (ContentResource)ref2.getEntity();
-									if(cr==null)
-										M_log.debug("null ContentResource");
-									else {
-										M_log.debug("cr " + cr.getId());
-										ContentReviewItem cri = contentReviewService.getItemBySubmissionId(s.getId(), cr.getId());
-										if(cri == null){
-											M_log.debug("cri is null");
-											return;
-										} else {
-											M_log.debug("cri " + cri.getId() + " - " + cri.getContentId());
-										}
-										
-										if(cri.isUrlAccessed()){
-											M_log.warn("Trying to access an url already accessed, submission id " + s.getId());
-											return;
-										}
-										
-										handleAccessResource(req, res, cr);
-											
-										boolean itemUpdated = contentReviewService.updateItemAccess(s.getId(), cr.getId());
-										if(!itemUpdated)
-											M_log.error("Could not update cr item access status");
-										
-										//TODO close sakai session
-										
-										//TODO any of the error cases should modify the cri so it gets processed again
+									if(cri.isUrlAccessed()){
+										M_log.warn("Trying to access an url already accessed, submission id " + s.getId());
+										return;
 									}
+
+									handleAccessResource(req, res, cr);
+									
+									boolean itemUpdated = contentReviewService.updateItemAccess(cr.getId());
+									if(!itemUpdated){
+										M_log.error("Could not update cr item access status");
+									}
+										
+									//TODO close sakai session
 								}
 							}
 						}
@@ -7374,6 +7369,12 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 	 */
 	public boolean canSubmit(String context, Assignment a)
 	{
+		// submissions are never allowed to non-electronic assignments  --bbailla2
+        if (a.getContent().getTypeOfSubmission() == Assignment.NON_ELECTRONIC_ASSIGNMENT_SUBMISSION)
+        {
+            return false;
+        }
+		
 		// return false if not allowed to submit at all
 		if (!allowAddSubmissionCheckGroups(context, a) && !allowAddAssignment(context) /*SAK-25555 return true if user is allowed to add assignment*/) return false;
 		
@@ -10445,6 +10446,8 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 		
 		protected String m_reviewIconUrl;
 		protected String m_reviewIconColor;
+		
+		protected boolean m_externalGradeDifferent;
 
         protected String m_reviewError;
 		
@@ -10529,6 +10532,77 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			
 		}
 		
+		// SAK-26322    --bbailla2
+        /**
+         * Essentially the same as getReviewScore() only it acts upon the ContentResource parameter rather than that which is returned by firstAcceptableAttachment().
+         * TODO: consider deleting getReviewScore(). If not possible, then refactor to eliminate code duplication
+         */
+        private int getReviewScore(ContentResource cr)
+        {
+            M_log.debug(this + " getReviewScore(ContentResource) for submission " + this.getId() + " and review service is: " + (this.getAssignment().getContent().getAllowReviewService()));
+ 
+            //null check, allow review service check
+            if (cr == null)
+            {
+                M_log.debug(this + " getReviewScore(ContentResource) called with cr == null");
+                return -2;
+            }
+ 
+            if (!this.getAssignment().getContent().getAllowReviewService())
+            {
+                M_log.debug(this + " getReviewScore(ContentResource) Content review is not enabled for this assignment");
+                return -2;
+            }
+ 
+            //get the status from the content review service, if it's in a valid status, get the score)
+            try
+            {
+                String contentId = cr.getId();
+                M_log.debug(this + " getReviewScore(ContentResource) checking for score for content: " + contentId);
+ 
+                Long status = contentReviewService.getReviewStatus(contentId);
+                if (status != null && (status.equals(ContentReviewItem.NOT_SUBMITTED_CODE) || status.equals(ContentReviewItem.SUBMITTED_AWAITING_REPORT_CODE)))
+                {
+                    M_log.debug(this + " getReviewStatus returned a state of: " + status);
+                    return -2;
+                }
+ 
+                int score = contentReviewService.getReviewScore(contentId);
+                // TODO: delete the following line if there will be no repercussions:
+                m_reviewScore = score;
+                M_log.debug(this + " getReviewScore(ContentResource) CR returned a score of: " + score);
+                return score;
+            }
+            catch (QueueException cie)
+            {
+                //should we add the item
+                try
+                {
+                    M_log.debug(" getReviewScore(ContentResource) Item is not in queue we will try to add it");
+                    String contentId = cr.getId();
+                    String userId = (String)this.getSubmitterId();
+                    try
+                    {
+                        contentReviewService.queueContent(userId, null, getAssignment().getReference(), contentId, this.getId());
+                    }
+                    catch (QueueException qe)
+                    {
+                        M_log.warn(" getReviewScore(ContentResource) Unable to queue content with content review service: " + qe.getMessage());
+                    }
+                }
+                catch (Exception e)
+                {
+                    e.printStackTrace();
+                }
+                return -1;
+            }
+            catch (Exception e)
+            {
+                M_log.warn(this + " getReviewScore " + e.getMessage());
+                return -1;
+            }
+        }
+		
 		public String getReviewReport() {
 //			 Code to get updated report if default
 			if (m_submittedAttachments.isEmpty()) { 
@@ -10574,6 +10648,48 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			
 		}
 		
+		//SAK-26322 --bbailla2
+        /**
+         * Essentially the same as getReviewReport(), only it acts upon the ContentResource that is passed rather than that which is returned from getFirstAcceptableAttachment()
+         * TODO: consider removing getReviewReport(). If this is not possible, eliminate code duplication
+         */
+        private String getReviewReport(ContentResource cr)
+        {
+            if (cr == null)
+            {
+                M_log.debug(this.getId() + " getReviewReport(ContentResource) called with cr == null");
+                return "Error";
+            }
+ 
+            try
+            {
+                String contentId = cr.getId();
+				boolean allowAnyFile = this.getAssignment().getContent().isAllowAnyFile();					
+				try {
+					Site site = SiteService.getSite(m_context);
+					boolean siteCanUseLTIReviewService = contentReviewSiteAdvisor.siteCanUseLTIReviewService(site);
+					if (siteCanUseLTIReviewService) {
+						return contentReviewService.getReviewReport(contentId);
+					} else {//old TII api
+						if (allowGradeSubmission(getReference())){
+							return contentReviewService.getReviewReportInstructor(contentId);//could use legacy methods
+						} else {
+							return contentReviewService.getReviewReportStudent(contentId);
+						}
+					}
+				} catch (IdUnusedException _iue) {
+					M_log.debug(this + " getReviewReport Could not find site from m_context value " + m_context);
+					return "error";
+				}
+            }
+            catch (Exception e)
+            {
+                M_log.warn(":getReviewReport(ContentResource) " + e.getMessage());
+                return "Error";
+            }
+        }
+		
+		//TODO: delete this and all calling methods if there are no repercussions   --bbailla2
 		private ContentResource getFirstAcceptableAttachement(boolean allowAnyFile) {
 			String contentId = null;
 			try {
@@ -10591,6 +10707,36 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			}
 			return null;
 		}
+		
+		/**
+         * SAK-26322
+         * Gets all attachments in m_submittedAttachments that are acceptable to the content review service
+         * @author bbailla2
+		 * also added allowAnyFile param
+		 * @author bgarcia
+         */	
+		private List<ContentResource> getAllAcceptableAttachments(boolean allowAnyFile)
+        {
+            List<ContentResource> attachments = new ArrayList<ContentResource>();
+            for (int i = 0; i< m_submittedAttachments.size(); i++)
+            {
+                try
+                {
+                    Reference ref = (Reference)m_submittedAttachments.get(i);
+                    ContentResource contentResource = (ContentResource)ref.getEntity();
+                    if (contentReviewService.isAcceptableSize(contentResource) && (allowAnyFile || contentReviewService.isAcceptableContent(contentResource)))
+                    {
+                        attachments.add((ContentResource)contentResource);
+                    }
+                }
+                catch (Exception e)
+                {
+                    M_log.warn(":getAllAcceptableAttachments() " + e.getMessage());
+                    e.printStackTrace();
+                }
+            }
+            return attachments;
+        }
 		
 		public String getReviewStatus() {
 			return m_reviewStatus;
@@ -10653,6 +10799,71 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
             }
         }
 
+		//SAK-26322 --bbailla2
+        /**
+         * Essentially the same as getReviewError(), only it acts upon the ContentResource that is passed rather than that which is returned from getFirstAcceptableAttachment()
+         */
+        private String getReviewError(ContentResource cr)
+        {
+            if (cr == null)
+            {
+                M_log.debug(this.getId() + " getReviewReport(ContentResource) called with cr == null");
+                return null;
+            }
+            try
+            {
+                String contentId = cr.getId();
+                //This should use getLocalizedReviewErrorMesage(contentId)
+                //to get a i18n message of the error
+                Long status = contentReviewService.getReviewStatus(contentId);
+                String errorMessage = null;
+ 
+                // TODO: we can remove this null check if we use yoda statements below  --bbailla2
+                if (status != null)
+                {
+                    if (status.equals(ContentReviewItem.REPORT_ERROR_NO_RETRY_CODE))
+                    {
+                        errorMessage = rb.getString("content_review.error.REPORT_ERROR_NO_RETRY_CODE");
+                    }
+                    else if (status.equals(ContentReviewItem.REPORT_ERROR_RETRY_CODE))
+                    {
+                        errorMessage = rb.getString("content_review.error.REPORT_ERROR_RETRY_CODE");
+                    }
+                    else if (status.equals(ContentReviewItem.SUBMISSION_ERROR_NO_RETRY_CODE))
+                    {
+                        errorMessage = rb.getString("content_review.error.SUBMISSION_ERROR_NO_RETRY_CODE");
+                    }
+                    else if (status.equals(ContentReviewItem.SUBMISSION_ERROR_RETRY_CODE))
+                    {
+                        errorMessage = rb.getString("content_review.error.SUBMISSION_ERROR_RETRY_CODE");
+                    }
+                    else if (status.equals(ContentReviewItem.SUBMISSION_ERROR_RETRY_EXCEEDED))
+                    {
+                        errorMessage = rb.getString("content_review.error.SUBMISSION_ERROR_RETRY_EXCEEDED_CODE");
+                    }
+                    else if (status.equals(ContentReviewItem.SUBMISSION_ERROR_USER_DETAILS_CODE))
+                    {
+                        errorMessage = rb.getString("content_review.error.SUBMISSION_ERROR_USER_DETAILS_CODE");
+                    }
+                    else if (ContentReviewItem.SUBMITTED_AWAITING_REPORT_CODE.equals(status) || ContentReviewItem.NOT_SUBMITTED_CODE.equals(status))
+                    {
+                        errorMessage = rb.getString("content_review.pending.info");
+                    }
+                }
+ 
+                if (errorMessage == null)
+                {
+                    errorMessage = rb.getString("content_review.error");
+                }
+ 
+                return errorMessage;
+            }
+            catch (Exception e)
+            {
+                M_log.warn(this + ":getReviewError(ContentResource) " + e.getMessage());
+                return null;
+            }
+        }
 
 		public String getReviewIconUrl() {
 			if (m_reviewIconUrl == null )
@@ -10667,6 +10878,49 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 				
 			return m_reviewIconColor;
 		}
+		
+		public boolean isExternalGradeDifferent() {
+			return m_externalGradeDifferent;
+		}
+
+		// SAK-26322    --bbailla2
+        /**
+         * @inheritDoc
+         */
+        @Override
+        public List<ContentReviewResult> getContentReviewResults()
+        {
+            ArrayList<ContentReviewResult> reviewResults = new ArrayList<ContentReviewResult>();
+ 
+            //get all the attachments for this submission and populate the reviewResults
+			boolean allowAnyFile = this.getAssignment().getContent().isAllowAnyFile();
+            List<ContentResource> contentResources = getAllAcceptableAttachments(allowAnyFile);
+            for(ContentResource cr : contentResources)
+            {
+                ContentReviewResult reviewResult = new ContentReviewResult();
+ 
+                reviewResult.setContentResource(cr);
+                int reviewScore = getReviewScore(cr);
+                reviewResult.setReviewScore(reviewScore);
+                reviewResult.setReviewReport(getReviewReport(cr));
+                //skip review status, it's unused
+                String iconUrl = contentReviewService.getIconUrlforScore(Long.valueOf(reviewScore));
+                reviewResult.setReviewIconURL(iconUrl);
+				reviewResult.setReviewIconColor(contentReviewService.getIconColorforScore(Long.valueOf(reviewScore)));
+				reviewResult.setExternalGrade(contentReviewService.getExternalGradeForContentId(cr.getId()));
+                reviewResult.setReviewError(getReviewError(cr));
+ 
+                if ("true".equals(cr.getProperties().getProperty(PROP_INLINE_SUBMISSION)))
+                {
+                    reviewResults.add(0, reviewResult);
+                }
+                else
+                {
+                    reviewResults.add(reviewResult);
+                }
+            }
+            return reviewResults;
+        }
 		
 		/**
 		 * constructor
@@ -10797,6 +11051,8 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			m_gradeReleased = getBool(el.getAttribute("gradereleased"));
 			m_honorPledgeFlag = getBool(el.getAttribute("pledgeflag"));
 			m_hideDueDate = getBool(el.getAttribute("hideduedate"));
+			
+			m_externalGradeDifferent = getBool(el.getAttribute("isexternalgradedif"));
 
 			m_submittedText = FormattedText.decodeFormattedTextAttribute(el, "submittedtext");
 			m_feedbackComment = FormattedText.decodeFormattedTextAttribute(el, "feedbackcomment");
@@ -11129,6 +11385,8 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 							m_gradeReleased = getBool(attributes.getValue("gradereleased"));
 							m_honorPledgeFlag = getBool(attributes.getValue("pledgeflag"));
 							m_hideDueDate = getBool(attributes.getValue("hideduedate"));
+							
+							m_externalGradeDifferent = getBool(attributes.getValue("isexternalgradedif"));
 
 							m_submittedText = formattedTextDecodeFormattedTextAttribute(attributes, "submittedtext");
 							m_feedbackComment = formattedTextDecodeFormattedTextAttribute(attributes, "feedbackcomment");
@@ -11304,6 +11562,8 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			submission.setAttribute("gradereleased", getBoolString(m_gradeReleased));
 			submission.setAttribute("pledgeflag", getBoolString(m_honorPledgeFlag));
 			submission.setAttribute("hideduedate", getBoolString(m_hideDueDate));
+			
+			submission.setAttribute("isexternalgradedif", getBoolString(m_externalGradeDifferent));
 
 			if (M_log.isDebugEnabled()) M_log.debug(this + " BaseAssignmentSubmission: SAVED REGULAR PROPERTIES");
 
@@ -11432,6 +11692,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			m_gradedBy = submission.getGradedBy();
 			m_gradeReleased = submission.getGradeReleased();
 			m_honorPledgeFlag = submission.getHonorPledgeFlag();
+			m_externalGradeDifferent = submission.isExternalGradeDifferent();
 			m_properties = new BaseResourcePropertiesEdit();
 			m_properties.addAll(submission.getProperties());
 		}
@@ -11891,6 +12152,30 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 		{
 			return m_submittedAttachments;
 		}
+		
+		//SAK-26322 --bbailla2
+        /**
+         * @inheritDoc
+         */
+        @Override
+        public List getVisibleSubmittedAttachments()
+        {
+            List visibleAttachments = new ArrayList();
+            if (m_submittedAttachments != null)
+            {
+                Iterator itAttachments = m_submittedAttachments.iterator();
+                while (itAttachments.hasNext())
+                {
+                    Reference attachment = (Reference) itAttachments.next();
+                    ResourceProperties props = attachment.getProperties();
+                    if (!"true".equals(props.getProperty(PROP_INLINE_SUBMISSION)))
+                    {
+                        visibleAttachments.add(attachment);
+                    }
+                }
+            }
+            return visibleAttachments;
+        }
 
 		/**
 		 * Get the general comments by the grader
@@ -12610,19 +12895,15 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 
 			try {
 				boolean allowAnyFile = this.getAssignment().getContent().isAllowAnyFile();
-				ContentResource cr = getFirstAcceptableAttachement(attachments, allowAnyFile);
+				//SAK-26322 --bbailla2
+                List<ContentResource> resources = getAllAcceptableAttachments(attachments, allowAnyFile);
 				Assignment ass = this.getAssignment();
-				if (ass != null && cr != null)
+				if (ass != null)
 				{
-					if (cr != null)
-					{
-						contentReviewService.queueContent(null, null, ass.getReference(), cr.getId(), this.getId());
-					}
-					else
-					{
-						// TODO We really need to handle this as the user should be aware that nothing can be sent to TII
-						M_log.warn(this + " BaseAssignmentSubmission postAttachment: No suitable attachments found for submission: "+ this.m_id);
-					}
+					for(ContentResource current : resources)
+                    {
+                        contentReviewService.queueContent(null, null, ass.getReference(), current.getId(), this.getId());
+                    }
 				}
 				else
 				{
@@ -12641,11 +12922,14 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			//Send the attachment to the review service
 			try {
 				boolean allowAnyFile = this.getAssignment().getContent().isAllowAnyFile();
-				ContentResource cr = getFirstAcceptableAttachement(attachments, allowAnyFile);
+				List<ContentResource> resources = getAllAcceptableAttachments(attachments, allowAnyFile);
 				Assignment ass = this.getAssignment();
-				if (ass != null && cr != null)
+				if (ass != null)
 				{
-					contentReviewService.queueResubContent(null, null, ass.getReference(), cr.getId(), this.getId());//same, could be used same method but
+					for(ContentResource current : resources)
+                    {
+                        contentReviewService.queueResubContent(null, null, ass.getReference(), current.getId(), this.getId());
+                    }
 				}
 				else
 				{
@@ -12686,6 +12970,40 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			}
 			return null;
 		}
+		
+		private List<ContentResource> getAllAcceptableAttachments(List attachments, boolean allowAnyFile)
+        {
+            List<ContentResource> resources = new ArrayList<ContentResource>();
+            for (int i = 0; i < attachments.size(); i++)
+            {
+                Reference attachment = (Reference) attachments.get(i);
+                try
+                {
+                    ContentResource res = m_contentHostingService.getResource(attachment.getId());
+                    if (contentReviewService.isAcceptableSize(res) && (allowAnyFile || contentReviewService.isAcceptableContent(res)))
+                    {
+                        resources.add(res);
+                    }
+                }
+                catch (PermissionException e)
+                {
+                    e.printStackTrace();
+                    M_log.warn(":getAllAcceptableAttachments " + e.getMessage());
+                }
+                catch (IdUnusedException e)
+                {
+                    e.printStackTrace();
+                    M_log.warn(":getAllAcceptableAttachments " + e.getMessage());
+                }
+                catch (TypeException e)
+                {
+                    e.printStackTrace();
+                    M_log.warn(":getAllAcceptableAttachments " + e.getMessage());
+                }
+            }
+ 
+            return resources;
+        }
 		
 		/**
 		 * Take all values from this object.
@@ -12794,6 +13112,10 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			this.m_reviewIconColor = color;			
 		}
 
+		public void setExternalGradeDifferent(boolean externalGradeDifferent) {
+			this.m_externalGradeDifferent = externalGradeDifferent;			
+		}
+		
 		public void setReviewStatus(String status) {
 			this.m_reviewStatus = status;
 		

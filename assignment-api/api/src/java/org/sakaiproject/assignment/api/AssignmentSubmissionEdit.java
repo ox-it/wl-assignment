@@ -212,6 +212,12 @@ public interface AssignmentSubmissionEdit extends AssignmentSubmission, Edit
 	public void setReviewIconColor(String url);
 	
 	/**
+	 * When the external grade for this submission is different than the assignments one
+	 * @return
+	 */
+	public void setExternalGradeDifferent(boolean different);
+	
+	/**
 	 * Set the content review status
 	 * @param status
 	 */

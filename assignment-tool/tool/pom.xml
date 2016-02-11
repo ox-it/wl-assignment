@@ -118,6 +118,15 @@
             <groupId>org.sakaiproject.scheduler</groupId>
             <artifactId>scheduler-api</artifactId>
         </dependency>
+		
+		<!-- TODO: update kernel and remove -->
+		<dependency>
+		  <groupId>org.jsoup</groupId>
+		  <artifactId>jsoup</artifactId>
+		  <version>1.7.3</version>
+		  <type>jar</type>
+		  <scope>compile</scope>
+		</dependency>
 
     </dependencies>
 
