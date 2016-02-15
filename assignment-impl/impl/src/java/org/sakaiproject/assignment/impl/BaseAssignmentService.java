@@ -12943,7 +12943,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			}
 		}
 
-		private ContentResource getFirstAcceptableAttachement(List attachments, boolean allowAnyFile) {//TODO might be losing checkings
+		private ContentResource getFirstAcceptableAttachement(List attachments, boolean allowAnyFile) {
 			
 			for( int i =0; i < attachments.size();i++ ) { 
 				Reference attachment = (Reference)attachments.get(i);

@@ -793,7 +793,7 @@
                                             #else
                                                 <a href="$reviewResult.getReviewReport()" target="_blank">
                                                     ##<img src="$reviewResult.getReviewIconURL()" alt="$reviewResult.getReviewScore()" title="$reviewResult.getReviewScore()">
-													<i alt="$submission.getReviewScore()" title="$reviewResult.getReviewScore()" class="fa fa-flag flagStyle" style="color:$submission.getReviewIconColor() !important"></i>
+													<i alt="$reviewResult.getReviewScore()" title="$reviewResult.getReviewScore()" class="fa fa-flag flagStyle" style="color:$reviewResult.getReviewIconColor() !important"></i>
                                                 </a>
                                             #end
                                             </span>

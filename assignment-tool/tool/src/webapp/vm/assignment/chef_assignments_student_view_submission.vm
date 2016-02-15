@@ -364,7 +364,7 @@ function submitform(id)
                                             <img src="/library/skin/images/error.png" alt="$reviewResult.getReviewError()" title="$reviewResult.getReviewError()">
                                         #else
                                             <a href="$reviewResult.getReviewReport()" target="_blank">
-												<i alt="$submission.getReviewScore()" title="$reviewResult.getReviewScore() class="fa fa-flag reviewStyle" style="color:$submission.getReviewIconColor()"></i>
+												<i alt="$reviewResult.getReviewScore()" title="$reviewResult.getReviewScore() class="fa fa-flag reviewStyle" style="color:$reviewResult.getReviewIconColor()"></i>
                                             </a>
                                         #end
                                         </span>
