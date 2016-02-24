@@ -373,6 +373,11 @@ function submitform(id)
                                         #else
                                             $validator.escapeHtml($props.getPropertyFormatted($props.NamePropDisplayName))
                                         #end
+										#if($reviewResult.getExternalGrade() && $assignment.getContent().AllowStudentViewExternalGrade)
+											<span style="font-style:italic !important">
+												( $tlang.getString("gen.gra.ext") $reviewResult.getExternalGrade() )
+											</span>
+										#end
                                     </div>
                                 #end
                                 #if ($reviewResults.size() >= 3)

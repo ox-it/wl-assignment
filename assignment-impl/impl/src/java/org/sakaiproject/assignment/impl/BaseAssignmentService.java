@@ -8939,6 +8939,8 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 		protected boolean m_allowReviewService;
 		
 		protected boolean m_allowStudentViewReport;
+		
+		protected boolean m_allowStudentViewExternalGrade;
 
 		String m_submitReviewRepo;
 		String m_generateOriginalityReport;
@@ -9018,6 +9020,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 			m_hideDueDate = getBool(el.getAttribute("hideduedate"));
 			m_allowReviewService = getBool(el.getAttribute("allowreview"));
 			m_allowStudentViewReport = getBool(el.getAttribute("allowstudentview"));
+			m_allowStudentViewExternalGrade = getBool(el.getAttribute("allowstudentviewexternalgrade"));
 			m_submitReviewRepo = el.getAttribute("submitReviewRepo");
 			m_generateOriginalityReport = el.getAttribute("generateOriginalityReport");
 			m_checkTurnitin = getBool(el.getAttribute("checkTurnitin"));
@@ -9225,6 +9228,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 							m_hideDueDate = getBool(attributes.getValue("hideduedate"));
 							m_allowReviewService = getBool(attributes.getValue("allowreview"));
 							m_allowStudentViewReport = getBool(attributes.getValue("allowstudentview"));
+							m_allowStudentViewExternalGrade = getBool(attributes.getValue("allowstudentviewexternalgrade"));
 							m_submitReviewRepo = attributes.getValue("submitReviewRepo");
 							m_generateOriginalityReport = attributes.getValue("generateOriginalityReport");
 							m_checkTurnitin = getBool(attributes.getValue("checkTurnitin"));
@@ -9401,6 +9405,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 		
 			content.setAttribute("allowreview", getBoolString(m_allowReviewService));
 			content.setAttribute("allowstudentview", getBoolString(m_allowStudentViewReport));
+			content.setAttribute("allowstudentviewexternalgrade", getBoolString(m_allowStudentViewExternalGrade));
 			content.setAttribute("submitReviewRepo", m_submitReviewRepo);
 			content.setAttribute("generateOriginalityReport", m_generateOriginalityReport);
 			content.setAttribute("checkTurnitin", getBoolString(m_checkTurnitin));
@@ -9481,6 +9486,7 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 				//Uct
 				m_allowReviewService = content.getAllowReviewService();
 				m_allowStudentViewReport = content.getAllowStudentViewReport();
+				m_allowStudentViewExternalGrade = content.getAllowStudentViewExternalGrade();
 				m_submitReviewRepo = content.getSubmitReviewRepo();
 				m_generateOriginalityReport = content.getGenerateOriginalityReport();
 				m_checkTurnitin = content.isCheckTurnitin();
@@ -9803,6 +9809,10 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 		
 		public boolean getAllowStudentViewReport() {
 			return m_allowStudentViewReport;
+		}
+		
+		public boolean getAllowStudentViewExternalGrade() {
+			return m_allowStudentViewExternalGrade;
 		}
 		
 		
@@ -10233,6 +10243,16 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
 		 */
 		public void setAllowStudentViewReport(boolean allow) {
 			m_allowStudentViewReport = allow;
+		}
+		
+ 		/**
+		 * Does this Assignment allow students to view the external grades?
+		 * 
+		 * @param allow -
+		 *        true if the Assignment allows students to view the external grades, false otherwise
+		 */
+		public void setAllowStudentViewExternalGrade(boolean allow) {
+			m_allowStudentViewExternalGrade = allow;
 		}
 		
 		/**

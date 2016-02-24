@@ -781,11 +781,6 @@
                                     #end
                                     #foreach($reviewResult in $reviewResults)
                                         <div>
-											#if ($reviewResult.getExternalGrade())
-												<span style="font-style:italic !important">
-													( $tlang.getString("gen.gra.ext") $reviewResult.getExternalGrade() )
-												</span>
-											#end
                                             #set ($props = $reviewResult.getContentResource().Properties)
                                             <span class="reportIcon">
                                             #if ($reviewResult.getReviewReport().equals("Error"))
@@ -802,6 +797,11 @@
                                             #else
                                                 $validator.escapeHtml($props.getPropertyFormatted($props.NamePropDisplayName))
                                             #end
+											#if ($reviewResult.getExternalGrade())
+												<span style="font-style:italic !important">
+													( $tlang.getString("gen.gra.ext") $reviewResult.getExternalGrade() )
+												</span>
+											#end
                                         </div>
                                     #end
                                     #if ($reviewResults.size() >= 3)

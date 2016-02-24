@@ -55,6 +55,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.TimeZone;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
@@ -200,6 +201,7 @@ public class AssignmentAction extends PagedResourceActionII
 	private static final String NEW_ASSIGNMENT_USE_REVIEW_SERVICE = "new_assignment_use_review_service";
 	
 	private static final String NEW_ASSIGNMENT_ALLOW_STUDENT_VIEW = "new_assignment_allow_student_view";
+	private static final String NEW_ASSIGNMENT_ALLOW_STUDENT_VIEW_EXTERNAL_GRADE = "new_assignment_allow_student_view_external_grade";
 	private static final String NEW_ASSIGNMENT_REVIEW_SERVICE_SUBMIT_RADIO = "submit_papers_to";
 	private static final String NEW_ASSIGNMENT_REVIEW_SERVICE_SUBMIT_NONE = "0";
 	private static final String NEW_ASSIGNMENT_REVIEW_SERVICE_SUBMIT_STANDARD = "1";
@@ -2315,6 +2317,7 @@ public class AssignmentAction extends PagedResourceActionII
 		context.put("name_PeerAssessmentInstructions", NEW_ASSIGNMENT_PEER_ASSESSMENT_INSTRUCTIONS);
 		context.put("name_UseReviewService", NEW_ASSIGNMENT_USE_REVIEW_SERVICE);
 		context.put("name_AllowStudentView", NEW_ASSIGNMENT_ALLOW_STUDENT_VIEW);
+		context.put("name_AllowStudentViewExternalGrade", NEW_ASSIGNMENT_ALLOW_STUDENT_VIEW_EXTERNAL_GRADE);
 		context.put("name_NEW_ASSIGNMENT_REVIEW_SERVICE_SUBMIT_RADIO", NEW_ASSIGNMENT_REVIEW_SERVICE_SUBMIT_RADIO);
 		context.put("name_NEW_ASSIGNMENT_REVIEW_SERVICE_SUBMIT_NONE", NEW_ASSIGNMENT_REVIEW_SERVICE_SUBMIT_NONE);
 		context.put("name_NEW_ASSIGNMENT_REVIEW_SERVICE_SUBMIT_STANDARD", NEW_ASSIGNMENT_REVIEW_SERVICE_SUBMIT_STANDARD);
@@ -2415,6 +2418,7 @@ public class AssignmentAction extends PagedResourceActionII
 		context.put("value_UseReviewService", state.getAttribute(NEW_ASSIGNMENT_USE_REVIEW_SERVICE));
 		context.put("turnitin_forceSingleAttachment", ServerConfigurationService.getBoolean("turnitin.forceSingleAttachment", false));
 		context.put("value_AllowStudentView", state.getAttribute(NEW_ASSIGNMENT_ALLOW_STUDENT_VIEW) == null ? Boolean.toString(ServerConfigurationService.getBoolean("turnitin.allowStudentView.default", false)) : state.getAttribute(NEW_ASSIGNMENT_ALLOW_STUDENT_VIEW));
+		context.put("value_AllowStudentViewExternalGrade", state.getAttribute(NEW_ASSIGNMENT_ALLOW_STUDENT_VIEW_EXTERNAL_GRADE) == null ? Boolean.toString(ServerConfigurationService.getBoolean("turnitin.allowStudentViewExternalGrade.default", false)) : state.getAttribute(NEW_ASSIGNMENT_ALLOW_STUDENT_VIEW_EXTERNAL_GRADE));		
 		
 		List<String> subOptions = getSubmissionRepositoryOptions();
 		String submitRadio = ServerConfigurationService.getString("turnitin.repository.setting.value", "");
@@ -6532,6 +6536,12 @@ public class AssignmentAction extends PagedResourceActionII
 		else b = Boolean.TRUE.toString();
 		state.setAttribute(NEW_ASSIGNMENT_ALLOW_STUDENT_VIEW, b);
 		
+		//set whether students can view the review service results
+		r = params.getString(NEW_ASSIGNMENT_ALLOW_STUDENT_VIEW_EXTERNAL_GRADE);
+		if (r == null) b = Boolean.FALSE.toString();
+		else b = Boolean.TRUE.toString();
+		state.setAttribute(NEW_ASSIGNMENT_ALLOW_STUDENT_VIEW_EXTERNAL_GRADE, b);
+		
 		//set submit options
 		r = params.getString(NEW_ASSIGNMENT_REVIEW_SERVICE_SUBMIT_RADIO);
 		if (r == null && Boolean.TRUE.toString().equals(state.getAttribute(NEW_ASSIGNMENT_USE_REVIEW_SERVICE))) {
@@ -7473,6 +7483,7 @@ public class AssignmentAction extends PagedResourceActionII
 			boolean useReviewService = "true".equalsIgnoreCase((String) state.getAttribute(NEW_ASSIGNMENT_USE_REVIEW_SERVICE));
 			
 			boolean allowStudentViewReport = "true".equalsIgnoreCase((String) state.getAttribute(NEW_ASSIGNMENT_ALLOW_STUDENT_VIEW));
+			boolean allowStudentViewExternalGrade = "true".equalsIgnoreCase((String) state.getAttribute(NEW_ASSIGNMENT_ALLOW_STUDENT_VIEW_EXTERNAL_GRADE));
 			
 			String submitReviewRepo = (String) state.getAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_SUBMIT_RADIO);
 			String generateOriginalityReport = (String) state.getAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_REPORT_RADIO);
@@ -7564,7 +7575,7 @@ public class AssignmentAction extends PagedResourceActionII
                 state.setAttribute("contentReviewSuccess", Boolean.TRUE);
 
 				// commit the changes to AssignmentContent object
-				commitAssignmentContentEdit(state, ac, title, submissionType,useReviewService,allowStudentViewReport, gradeType, gradePoints, description, checkAddHonorPledge, attachments, submitReviewRepo, generateOriginalityReport, checkTurnitin, checkInternet, checkPublications, checkInstitution, excludeBibliographic, excludeQuoted, excludeType, excludeValue, allowAnyFile, openTime, dueTime, closeTime, hideDueDate, assignmentId);
+				commitAssignmentContentEdit(state, ac, title, submissionType,useReviewService,allowStudentViewReport,allowStudentViewExternalGrade, gradeType, gradePoints, description, checkAddHonorPledge, attachments, submitReviewRepo, generateOriginalityReport, checkTurnitin, checkInternet, checkPublications, checkInstitution, excludeBibliographic, excludeQuoted, excludeType, excludeValue, allowAnyFile, openTime, dueTime, closeTime, hideDueDate, assignmentId);
 				
 				// set the Assignment Properties object
 				ResourcePropertiesEdit aPropertiesEdit = a.getPropertiesEdit();
@@ -8614,7 +8625,7 @@ public class AssignmentAction extends PagedResourceActionII
 		}
 	}
 
-	private void commitAssignmentContentEdit(SessionState state, AssignmentContentEdit ac, String title, int submissionType,boolean useReviewService, boolean allowStudentViewReport, int gradeType, String gradePoints, String description, String checkAddHonorPledge, List attachments, String submitReviewRepo, String generateOriginalityReport, boolean checkTurnitin, boolean checkInternet, boolean checkPublications, boolean checkInstitution, boolean excludeBibliographic, boolean excludeQuoted, int excludeType, int excludeValue, boolean allowAnyFile, Time openTime, Time dueTime, Time closeTime, boolean hideDueDate, String assignmentId) 
+	private void commitAssignmentContentEdit(SessionState state, AssignmentContentEdit ac, String title, int submissionType,boolean useReviewService, boolean allowStudentViewReport, boolean allowStudentViewExternalGrade, int gradeType, String gradePoints, String description, String checkAddHonorPledge, List attachments, String submitReviewRepo, String generateOriginalityReport, boolean checkTurnitin, boolean checkInternet, boolean checkPublications, boolean checkInstitution, boolean excludeBibliographic, boolean excludeQuoted, int excludeType, int excludeValue, boolean allowAnyFile, Time openTime, Time dueTime, Time closeTime, boolean hideDueDate, String assignmentId)
 	{
 		ac.setTitle(title);
 		ac.setInstructions(description);
@@ -8623,6 +8634,7 @@ public class AssignmentAction extends PagedResourceActionII
 		ac.setTypeOfSubmission(submissionType);
 		ac.setAllowReviewService(useReviewService);
 		ac.setAllowStudentViewReport(allowStudentViewReport);
+		ac.setAllowStudentViewExternalGrade(allowStudentViewExternalGrade);
 		ac.setSubmitReviewRepo(submitReviewRepo);
 		ac.setGenerateOriginalityReport(generateOriginalityReport);
 		ac.setCheckInstitution(checkInstitution);
@@ -8728,6 +8740,8 @@ public class AssignmentAction extends PagedResourceActionII
         opts.put("dtstart", dform.format(openTime.getTime()));
         opts.put("dtdue", dform.format(dueTime.getTime()));
         //opts.put("dtpost", dform.format(closeTime.getTime()));
+		TimeZone tz = TimeZone.getTimeZone("UTC");
+		dform.setTimeZone(tz);
 		dform.applyPattern("yyyy-MM-dd'T'HH:mm");
 		opts.put("isostart", dform.format(openTime.getTime()));
 		opts.put("isodue", dform.format(dueTime.getTime()));
@@ -9220,6 +9234,8 @@ public class AssignmentAction extends PagedResourceActionII
 				
 				//set whether students can view the review service results
 				state.setAttribute(NEW_ASSIGNMENT_ALLOW_STUDENT_VIEW, Boolean.valueOf(a.getContent().getAllowStudentViewReport()).toString());
+				//set whether students can view the review service grades
+				state.setAttribute(NEW_ASSIGNMENT_ALLOW_STUDENT_VIEW_EXTERNAL_GRADE, Boolean.valueOf(a.getContent().getAllowStudentViewExternalGrade()).toString());
 				
 				state.setAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_SUBMIT_RADIO, a.getContent().getSubmitReviewRepo());
 				state.setAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_REPORT_RADIO, a.getContent().getGenerateOriginalityReport());
