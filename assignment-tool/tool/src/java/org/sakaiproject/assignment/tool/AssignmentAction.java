@@ -113,6 +113,7 @@ import org.sakaiproject.content.api.ContentResourceEdit;
 import org.sakaiproject.content.api.ContentTypeImageService;
 import org.sakaiproject.content.api.FilePickerHelper;
 import org.sakaiproject.contentreview.service.ContentReviewService;
+import org.sakaiproject.contentreview.service.ContentReviewSiteAdvisor;
 import org.sakaiproject.entity.api.Entity;
 import org.sakaiproject.entity.api.Reference;
 import org.sakaiproject.entity.api.ResourceProperties;
@@ -918,6 +919,7 @@ public class AssignmentAction extends PagedResourceActionII
 		
 		// Check whether content review service is enabled, present and enabled for this site
 		getContentReviewService();
+		getContentReviewSiteAdvisor();
 		context.put("allowReviewService", allowReviewService && contentReviewService != null && contentReviewService.isSiteAcceptable(s));
 
 		if (allowReviewService && contentReviewService != null && contentReviewService.isSiteAcceptable(s)) {
@@ -1493,22 +1495,22 @@ public class AssignmentAction extends PagedResourceActionII
 			canViewAssignmentIntoContext(context, assignment, s);
 			
 			// add TII info if needed
-			if (allowReviewService && assignment.getContent().getAllowReviewService()) {
-				//put the LTI assignment link in context
-				String ltiLink = contentReviewService.getLTIAccess(currentAssignmentReference, contextString);
-				M_log.debug("ltiLink " + ltiLink);
-				context.put("ltiLink", ltiLink);
-				Site st = null;
-			    try {
-			        st = SiteService.getSite(contextString);
+			Site st = null;
+			try {
+			    st = SiteService.getSite(contextString);
+				if (allowReviewService && assignment.getContent().getAllowReviewService() && contentReviewSiteAdvisor.siteCanUseLTIReviewService(st)){
+					//put the LTI assignment link in context
+					String ltiLink = contentReviewService.getLTIAccess(currentAssignmentReference, contextString);
+					M_log.debug("ltiLink " + ltiLink);
+					context.put("ltiLink", ltiLink);
 					if(contentReviewService.isDirectAccess(st) && canSubmit){
 						M_log.debug("Allowing submission directly from TII");
 						String templateAux = (String) getContext(data).get("template");
 						return templateAux + "_lti_access";
 					}
-				} catch (IdUnusedException iue) {
-			        M_log.warn(this + ":buildStudentViewSubmissionContext: Site not found!" + iue.getMessage());
-			    }
+				}
+			} catch (IdUnusedException iue) {
+			    M_log.warn(this + ":buildStudentViewSubmissionContext: Site not found!" + iue.getMessage());
 			}
 		}
 
@@ -3675,21 +3677,21 @@ public class AssignmentAction extends PagedResourceActionII
 		
 		String template = (String) getContext(data).get("template");
 		
-		if (allowReviewService && assignment != null && assignment.getContent() != null && assignment.getContent().getAllowReviewService()) {
-			String contextString = (String) state.getAttribute(STATE_CONTEXT_STRING);
-			String ltiLink = contentReviewService.getLTIAccess(assignmentRef, contextString);
-			M_log.debug("ltiLink " + ltiLink);
-			context.put("ltiLink", ltiLink);
-			Site st = null;
-			try {
-			    st = SiteService.getSite(contextString);		
+		String contextString = (String) state.getAttribute(STATE_CONTEXT_STRING);		
+		Site st = null;
+		try {
+			st = SiteService.getSite(contextString);		
+			if (allowReviewService && assignment != null && assignment.getContent().getAllowReviewService() && contentReviewSiteAdvisor.siteCanUseLTIReviewService(st)){
+				String ltiLink = contentReviewService.getLTIAccess(assignmentRef, contextString);
+				M_log.debug("ltiLink " + ltiLink);
+				context.put("ltiLink", ltiLink);
 				if(contentReviewService.isDirectAccess(st)){
 					M_log.debug("Allowing submission directly from TII");
 					return template + "_lti_access";
 				}
-			} catch (IdUnusedException iue) {
-				M_log.warn(this + ":build_instructor_grade_assignment_context: Site not found!" + iue.getMessage());
 			}
+		} catch (IdUnusedException iue) {
+			M_log.warn(this + ":build_instructor_grade_assignment_context: Site not found!" + iue.getMessage());
 		}
 		
 		return template + TEMPLATE_INSTRUCTOR_GRADE_ASSIGNMENT;
@@ -3799,12 +3801,18 @@ public class AssignmentAction extends PagedResourceActionII
 		context.put("contentTypeImageService", state.getAttribute(STATE_CONTENT_TYPE_IMAGE_SERVICE));
 		context.put("honor_pledge_text", ServerConfigurationService.getString("assignment.honor.pledge", rb.getString("gen.honple2")));
 		
-		if (allowReviewService && assignment.getContent().getAllowReviewService()) {
-			String contextString = (String) state.getAttribute(STATE_CONTEXT_STRING);
-			//put the LTI assignment link in context
-			String ltiLink = contentReviewService.getLTIAccess(assignmentId, contextString);
-			M_log.debug("ltiLink " + ltiLink);
-			context.put("ltiLink", ltiLink);
+		String contextString = (String) state.getAttribute(STATE_CONTEXT_STRING);
+		Site st = null;
+		try {
+		    st = SiteService.getSite(contextString);
+			if (allowReviewService && assignment.getContent().getAllowReviewService() && contentReviewSiteAdvisor.siteCanUseLTIReviewService(st)){
+				//put the LTI assignment link in context
+				String ltiLink = contentReviewService.getLTIAccess(assignmentId, contextString);
+				M_log.debug("ltiLink " + ltiLink);
+				context.put("ltiLink", ltiLink);
+			}
+		} catch (IdUnusedException iue) {
+			M_log.warn(this + ":build_instructor_view_assignment_context: Site not found!" + iue.getMessage());
 		}
 		
 		String template = (String) getContext(data).get("template");
@@ -5812,7 +5820,7 @@ public class AssignmentAction extends PagedResourceActionII
                             {
 								//Post the attachments before clearing so that we don't submit duplicate attachments
 								//Check if we need to post the attachments
-								if (a.getContent().getAllowReviewService()) {
+								if (a.getContent().getAllowReviewService() && post) {
 									if (!attachments.isEmpty()) { 
 										if(!isPreviousSubmissionTime){//isUserSubmission can be used too
 											sEdit.postAttachment(attachments);
@@ -5842,7 +5850,7 @@ public class AssignmentAction extends PagedResourceActionII
 						}
 						
 						// SAK-26322 - add inline as an attachment for the content review service   --bbailla2
-                        if (a.getContent().getAllowReviewService() && !isHtmlEmpty(text))
+                        if (a.getContent().getAllowReviewService() && !isHtmlEmpty(text) && post)
                         {
                             prepareInlineForContentReview(text, sEdit, state, submitter, isPreviousSubmissionTime);
                         }
@@ -5882,7 +5890,7 @@ public class AssignmentAction extends PagedResourceActionII
 							List attachments = (List) state.getAttribute(ATTACHMENTS);
 							
 							// SAK-26322 - add inline as an attachment for the content review service   --bbailla2
-                            if (a.getContent().getAllowReviewService() && !isHtmlEmpty(text))
+                            if (a.getContent().getAllowReviewService() && !isHtmlEmpty(text) && post)
                             {
                                 prepareInlineForContentReview(text, edit, state, submitter, false);
                             }
@@ -5890,7 +5898,7 @@ public class AssignmentAction extends PagedResourceActionII
 							if (attachments != null)
 							{
 	 							// add each attachment
-								if ((!attachments.isEmpty()) && a.getContent().getAllowReviewService()) 
+								if ((!attachments.isEmpty()) && a.getContent().getAllowReviewService() && post) 
 									edit.postAttachment(attachments);								
 								
 								// add each attachment
@@ -5992,7 +6000,7 @@ public class AssignmentAction extends PagedResourceActionII
         //create a byte array input stream
         //text is almost in html format, but it's missing the start and ending tags
         //(Is this always the case? Does the content review service care?)
-        String toHtml = "<html><head></head><body>" + text + "</body></html>";
+        String toHtml = "<html><head></head><body>" + FormattedText.unEscapeHtml(FormattedText.convertPlaintextToFormattedText(text)) + "</body></html>";
         InputStream contentStream = new ByteArrayInputStream(toHtml.getBytes());
  
         String contentType = "text/html";
@@ -9500,6 +9508,9 @@ public class AssignmentAction extends PagedResourceActionII
 				// remove related announcement if there is one
 				removeAnnouncement(state, pEdit);
 				
+				//remove related lti tool if there is one
+				removeLTITool(state, aEdit);
+				
 				// we use to check "assignment.delete.cascade.submission" setting. But the implementation now is always remove submission objects when the assignment is removed.
 				// delete assignment and its submissions altogether
 				deleteAssignmentObjects(state, aEdit, true);
@@ -9521,6 +9532,27 @@ public class AssignmentAction extends PagedResourceActionII
 
 	} // doDelete_Assignment
 
+	/**
+	 * private method to remove assignment related LTI tool
+	 * @param state
+	 * @param aEdit
+	 */
+	private void removeLTITool(SessionState state, AssignmentEdit aEdit){
+		String contextString = (String) state.getAttribute(STATE_CONTEXT_STRING);
+		Site st = null;
+		try {
+		    st = SiteService.getSite(contextString);
+			if (allowReviewService && aEdit.getContent().getAllowReviewService() && contentReviewSiteAdvisor.siteCanUseLTIReviewService(st)){
+				//put the LTI assignment link in context
+				boolean removed = contentReviewService.deleteLTITool(aEdit.getReference(), contextString);
+				if(!removed){
+					M_log.warn("Could not delete associated LTI tool");
+				}
+			}
+		} catch (IdUnusedException iue) {
+			M_log.warn(this + ":doDelete_assignment: Site not found!" + iue.getMessage());
+		}
+	}
 
 	/**
 	 * private function to remove assignment related announcement
@@ -15540,6 +15572,14 @@ public class AssignmentAction extends PagedResourceActionII
 		if (contentReviewService == null)
 		{
 			contentReviewService = (ContentReviewService) ComponentManager.get(ContentReviewService.class.getName());
+		}
+	}
+	
+	private ContentReviewSiteAdvisor contentReviewSiteAdvisor;
+	private void getContentReviewSiteAdvisor() {
+		if (contentReviewSiteAdvisor == null)
+		{
+			contentReviewSiteAdvisor = (ContentReviewSiteAdvisor) ComponentManager.get(ContentReviewSiteAdvisor.class.getName());
 		}
 	}
 	

@@ -10684,7 +10684,6 @@ public abstract class BaseAssignmentService implements AssignmentService, Entity
             try
             {
                 String contentId = cr.getId();
-				boolean allowAnyFile = this.getAssignment().getContent().isAllowAnyFile();					
 				try {
 					Site site = SiteService.getSite(m_context);
 					boolean siteCanUseLTIReviewService = contentReviewSiteAdvisor.siteCanUseLTIReviewService(site);
