@@ -466,7 +466,7 @@ $(document).ready(function() {
 			</select>
 			<div id="review.switch.ne.2" class="information" style="display:none;">$reviewSwitchNe2</div>
 		</p>
-		#if ($allowReviewService)
+		#if ($allowReviewService && !$allowLTIReviewService)
 			<p class="instruction labelindnt">
 				$tlang.getString("gen.cr.submit")
 			</p>

@@ -787,8 +787,7 @@
                                                 <img src="/library/skin/images/error.png" alt="$reviewResult.getReviewError()" title="$reviewResult.getReviewError()">
                                             #else
                                                 <a href="$reviewResult.getReviewReport()" target="_blank">
-                                                    ##<img src="$reviewResult.getReviewIconURL()" alt="$reviewResult.getReviewScore()" title="$reviewResult.getReviewScore()">
-													<i alt="$reviewResult.getReviewScore()" title="$reviewResult.getReviewScore()" class="fa fa-flag flagStyle" style="color:$reviewResult.getReviewIconColor() !important"></i>
+													<i alt="$tlang.getString("review.originality.alt") = $reviewResult.getReviewScore() %" title="$tlang.getString("review.originality.alt") = $reviewResult.getReviewScore() %" class="fa fa-flag flagStyle" style="color:$reviewResult.getReviewIconColor() !important"></i>
                                                 </a>
                                             #end
                                             </span>

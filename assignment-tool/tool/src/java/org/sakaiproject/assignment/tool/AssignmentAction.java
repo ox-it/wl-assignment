@@ -224,7 +224,7 @@ public class AssignmentAction extends PagedResourceActionII
 	private static final String NEW_ASSIGNMENT_REVIEW_SERVICE_EXCLUDE_SMALL_MATCHES = "exclude_smallmatches";
 	private static final String NEW_ASSIGNMENT_REVIEW_SERVICE_EXCLUDE_TYPE = "exclude_type";
 	private static final String NEW_ASSIGNMENT_REVIEW_SERVICE_EXCLUDE_VALUE = "exclude_value";
-	private static final String NEW_ASSIGNMENT_REVIEW_SERVICE_ALLOW_ANY_FILE = "journal_check";
+	private static final String NEW_ASSIGNMENT_REVIEW_SERVICE_ALLOW_ANY_FILE = "allow_any_file";
 	
 	
 	/** The attachments */
@@ -548,6 +548,10 @@ public class AssignmentAction extends PagedResourceActionII
 	private static final String NEW_ASSIGNMENT_FOCUS = "new_assignment_focus";
 
 	private static final String NEW_ASSIGNMENT_DESCRIPTION_EMPTY = "new_assignment_description_empty";
+	
+	private static final String NEW_ASSIGNMENT_SHORT_TITLE = "new_assignment_short_title";
+	
+	private static final String NEW_ASSIGNMENT_LONG_TITLE = "new_assignment_long_title";
 
 	private static final String NEW_ASSIGNMENT_ADD_TO_GRADEBOOK = "new_assignment_add_to_gradebook";
 
@@ -923,7 +927,7 @@ public class AssignmentAction extends PagedResourceActionII
 		context.put("allowReviewService", allowReviewService && contentReviewService != null && contentReviewService.isSiteAcceptable(s));
 
 		if (allowReviewService && contentReviewService != null && contentReviewService.isSiteAcceptable(s)) {
-			//put the review service stings in context
+			//put the review service strings in context
 			String reviewServiceName = contentReviewService.getServiceName();
 			String reviewServiceTitle = rb.getFormattedMessage("review.title", new Object[]{reviewServiceName});
 			String reviewServiceUse = rb.getFormattedMessage("review.use", new Object[]{reviewServiceName});
@@ -936,6 +940,9 @@ public class AssignmentAction extends PagedResourceActionII
 			context.put("contentReviewNote",content_review_note);
 			context.put("reviewSwitchNe1", reviewServiceNonElectronic1);
             context.put("reviewSwitchNe2", reviewServiceNonElectronic2);
+			if(contentReviewSiteAdvisor.siteCanUseLTIReviewService(s)){
+				context.put("allowLTIReviewService", true);
+			}
 		}
 		
 		//Peer Assessment
@@ -1800,6 +1807,22 @@ public class AssignmentAction extends PagedResourceActionII
 			}
 			
 			context.put("submissionType", submissionType);
+			
+			if (allowReviewService && currentAssignment.getContent().getAllowReviewService()){
+				context.put("usingreview", true);
+				if(StringUtils.isEmpty(user.getFirstName())){
+					M_log.debug("Name is null");
+					context.put("namenull", true);
+				}
+				if(StringUtils.isEmpty(user.getLastName())){
+					M_log.debug("LastName is null");
+					context.put("lastnamenull", true);
+				}
+				if(StringUtils.isEmpty(user.getEmail())){
+					M_log.debug("Email is null");
+					context.put("mailnull", true);
+				}
+			}
 			
 			AssignmentSubmission s = getSubmission(currentAssignmentReference, submitter, "build_student_view_submission_confirmation_context",state);
 			if (s != null)
@@ -6531,7 +6554,13 @@ public class AssignmentAction extends PagedResourceActionII
 		else b = Boolean.TRUE.toString();
 		state.setAttribute(NEW_ASSIGNMENT_USE_REVIEW_SERVICE, b);
 		
-		if (Boolean.TRUE.toString().equals(b)
+		Site st = null;
+		try {
+		    st = SiteService.getSite((String) state.getAttribute(STATE_CONTEXT_STRING));
+		} catch (IdUnusedException iue) {
+		    M_log.warn(this + ":setNewAssignmentParameters: Site not found!" + iue.getMessage());
+		}
+		if (contentReviewSiteAdvisor.siteCanUseLTIReviewService(st) && Boolean.TRUE.toString().equals(b)
 				&& ((Integer) state.getAttribute(NEW_ASSIGNMENT_SUBMISSION_TYPE)).intValue()
 					!= Assignment.SINGLE_ATTACHMENT_SUBMISSION)
 		{
@@ -6549,6 +6578,39 @@ public class AssignmentAction extends PagedResourceActionII
 		if (r == null) b = Boolean.FALSE.toString();
 		else b = Boolean.TRUE.toString();
 		state.setAttribute(NEW_ASSIGNMENT_ALLOW_STUDENT_VIEW_EXTERNAL_GRADE, b);
+		
+		if (allowReviewService){
+			if (validify){
+				if (title != null && title.length() < 3){
+					// if the title is shorter than the minimum post the message
+					// One could ignore the message and still post the assignment
+					if (state.getAttribute(NEW_ASSIGNMENT_SHORT_TITLE) == null){
+						state.setAttribute(NEW_ASSIGNMENT_SHORT_TITLE, Boolean.TRUE.toString());
+					} else {
+						state.removeAttribute(NEW_ASSIGNMENT_SHORT_TITLE);
+					}
+				} else {
+					state.removeAttribute(NEW_ASSIGNMENT_SHORT_TITLE);
+				}
+				if (title != null && title.length() > 99){
+					// if the title is longer than the maximum post the message
+					// One could ignore the message and still post the assignment
+					if (state.getAttribute(NEW_ASSIGNMENT_LONG_TITLE) == null){
+						state.setAttribute(NEW_ASSIGNMENT_LONG_TITLE, Boolean.TRUE.toString());
+					} else {
+						state.removeAttribute(NEW_ASSIGNMENT_LONG_TITLE);
+					}
+				} else {
+					state.removeAttribute(NEW_ASSIGNMENT_LONG_TITLE);
+				}
+			}
+			if (validify && state.getAttribute(NEW_ASSIGNMENT_SHORT_TITLE) != null){
+				addAlert(state, rb.getString("review.assignchars"));
+			}
+			if (validify && state.getAttribute(NEW_ASSIGNMENT_LONG_TITLE) != null){
+				addAlert(state, rb.getString("review.assigncharslong"));
+			}
+		}
 		
 		//set submit options
 		r = params.getString(NEW_ASSIGNMENT_REVIEW_SERVICE_SUBMIT_RADIO);
@@ -8546,9 +8608,6 @@ public class AssignmentAction extends PagedResourceActionII
 		a.setPeerAssessmentStudentViewReviews(peerAssessmentStudentViewReviews);
 		a.setPeerAssessmentNumReviews(peerAssessmentNumReviews);
 		a.setPeerAssessmentInstructions(peerAssessmentInstructions);
-		
-		// post the assignment
-		a.setDraft(!post);
 
 		try
 		{
@@ -9269,6 +9328,30 @@ public class AssignmentAction extends PagedResourceActionII
 				setAssignmentSupplementItemInState(state, a);
 				
 				state.setAttribute(STATE_MODE, MODE_INSTRUCTOR_NEW_EDIT_ASSIGNMENT);
+				
+				if(allowReviewService){
+					if (a.getTitle().length() < 3){//TODO length_assign as global property
+						addAlert(state, rb.getString("review.assignchars"));
+					} else if (a.getTitle().length() > 99){//TODO length_assign as global property
+						addAlert(state, rb.getString("review.assigncharslong"));
+					}
+					Site st = null;
+					try {
+						st = SiteService.getSite((String) state.getAttribute(STATE_CONTEXT_STRING));
+						if (st.getTitle().length() < 2){//TODO length as global property
+							addAlert(state, rb.getString("review.sitechars"));
+						}
+						// generate alert when editing an assignment from old site
+						GregorianCalendar agoCalendar = new GregorianCalendar();
+						agoCalendar.add(GregorianCalendar.YEAR, -6);//TODO years as global property
+						Date agoDate = agoCalendar.getTime();
+						if (st.getCreatedDate().before(agoDate)){
+							addAlert(state, rb.getString("review.oldsite"));
+						}
+					} catch (IdUnusedException iue) {
+						M_log.warn(this + ":doEdit_Assignment: Site not found!" + iue.getMessage());
+					}
+				}
 			}
 		}
 		else
@@ -11581,6 +11664,25 @@ public class AssignmentAction extends PagedResourceActionII
 		state.removeAttribute(ALLPURPOSE_ACCESS);
 		state.removeAttribute(ALLPURPOSE_ATTACHMENTS);
 
+		// generate alert when editing an assignment from old site
+		if(allowReviewService){
+			Site st = null;
+			try {
+				st = SiteService.getSite((String) state.getAttribute(STATE_CONTEXT_STRING));
+				if (st.getTitle().length()<2){//TODO length as global property
+					addAlert(state, rb.getString("review.sitechars"));
+				}
+				GregorianCalendar agoCalendar = new GregorianCalendar();
+				agoCalendar.add(GregorianCalendar.YEAR, -6);//TODO years as global property
+				Date agoDate = agoCalendar.getTime();
+				if (st.getCreatedDate().before(agoDate)){
+					addAlert(state, rb.getString("review.oldsite"));
+				}
+			} catch (IdUnusedException iue) {
+				M_log.warn(this + ":initializeAssignment: Site not found!" + iue.getMessage());
+			}
+		}
+		
 	} // initializeAssignment
 	
 	/**
@@ -15890,8 +15992,10 @@ public class AssignmentAction extends PagedResourceActionII
 						// of further permissions
 						m_securityService.pushAdvisor(sa);
 						ContentResource attachment = m_contentHostingService.addAttachmentResource(resourceId, siteId, "Assignments", contentType, fileContentStream, props);
-						if(!contentReviewService.isAcceptableContent(attachment)) {
-							addAlert(state, rb.getFormattedMessage("turnitin.notprocess.warning"));
+						if(allowReviewService && !contentReviewService.isAcceptableContent(attachment)) {
+							addAlert(state, rb.getFormattedMessage("cr.notprocess.warning"));
+						} else if(allowReviewService && !contentReviewService.isAcceptableSize(attachment)) {
+							addAlert(state, rb.getFormattedMessage("cr.size.warning"));
 						}
 
 						try

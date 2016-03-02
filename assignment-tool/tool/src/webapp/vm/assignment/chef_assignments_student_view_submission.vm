@@ -122,9 +122,6 @@ function submitform(id)
 	#end
 	#if ($!canSubmit)
 		#if ($alertMessage)<div class="alertMessage">$tlang.getString("gen.alert") $alertMessage</div><div class="clear"></div>#end
-		<a href="$ltiLink" target="_blank">
-			LINK (just for testing)
-		</a>
 		#if ($!submission && $timeSubmitted)
 			## if there is a submitted submission
 			## get the properies
@@ -364,7 +361,7 @@ function submitform(id)
                                             <img src="/library/skin/images/error.png" alt="$reviewResult.getReviewError()" title="$reviewResult.getReviewError()">
                                         #else
                                             <a href="$reviewResult.getReviewReport()" target="_blank">
-												<i alt="$reviewResult.getReviewScore()" title="$reviewResult.getReviewScore() class="fa fa-flag reviewStyle" style="color:$reviewResult.getReviewIconColor()"></i>
+												<i alt="$tlang.getString("review.originality.alt") = $reviewResult.getReviewScore() %" title="$tlang.getString("review.originality.alt") = $reviewResult.getReviewScore() %" class="fa fa-flag reviewStyle" style="color:$reviewResult.getReviewIconColor()"></i>
                                             </a>
                                         #end
                                         </span>
@@ -700,7 +697,7 @@ function submitform(id)
 							#end
 							#if ($plagiarismNote)
                                 <p>
-                                    <img alt="$reviewIndicator" title="$reviewIndicator" src="/library/image/silk/rosette.png" class="assignmentRosette"/>
+                                    <i alt="$reviewIndicator" title="$reviewIndicator" class="fa fa-certificate reviewStyle"></i>
                                     <em>$plagiarismNote</em>
                                 </p>
                             #end
@@ -769,7 +766,6 @@ function submitform(id)
 				#if (($submissionType == 2) || ($submissionType == 5))
                     #if ($plagiarismNote)
                         <p>
-                            ##<img alt="$reviewIndicator" title="$reviewIndicator" src="/library/image/silk/rosette.png" class="assignmentRosette"/>
 							<i alt="$reviewIndicator" title="$reviewIndicator" class="fa fa-certificate reviewStyle"></i>
                             <em>$plagiarismNote</em>
                         </p>
@@ -796,7 +792,9 @@ function submitform(id)
 					</h3>	
 					#if ($assignment.getContent().getAllowReviewService())
 						<p class="instruction"><i alt="$reviewIndicator" title="$reviewIndicator" class="fa fa-certificate reviewStyle"></i> $reviewIndicator</p>
-						<p class="instruction">$tlang.getString("content_review.studentNote")</p>
+						#if (!$assignment.getContent().isAllowAnyFile())
+							<p class="instruction">$tlang.getString("content_review.studentNote")</p>
+						#end
 					#end
 					#set ($size = 0)
 					#set ($props = false)

@@ -25,9 +25,6 @@
 	</h3>
 	#if ($alertMessage)<div class="alertMessage">$tlang.getString("gen.alert") $alertMessage</div><div class="clear"></div>#end
 		#if ($allowAddAssignment && !$hideAssignmentFlag)
-		<a href="$ltiLink" target="_blank">
-			LINK (just for testing)
-		</a>
 		## show assignment content
 		<p class="discTria">
 			<a href="#" onclick="location='#toolLink("AssignmentAction" "doHide_view_assignment")'; return false;" title="$tlang.getString("gen.hidassinf")">
@@ -206,6 +203,20 @@
 					#end
 				</td>
 			</tr>
+			#if($allowReviewService && $assignment.getContent().AllowReviewService)
+				<tr> 
+					<th>
+						$tlang.getString("content.review")
+					</th>
+					<td>
+					#if($!ltiLink)
+						<a href="$ltiLink" title="$tlang.getString("content.review.inbox")" target="_blank">$reviewServiceName</a>
+					#else
+						$reviewServiceName
+					#end
+					</td>
+				</tr>
+			#end
 		</table>
 		<h4>
 			$tlang.getString("gen.assinf")
