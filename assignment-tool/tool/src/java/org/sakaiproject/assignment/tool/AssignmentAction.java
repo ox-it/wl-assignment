@@ -6560,8 +6560,8 @@ public class AssignmentAction extends PagedResourceActionII
 		} catch (IdUnusedException iue) {
 		    M_log.warn(this + ":setNewAssignmentParameters: Site not found!" + iue.getMessage());
 		}
-		if (contentReviewSiteAdvisor.siteCanUseLTIReviewService(st) && Boolean.TRUE.toString().equals(b)
-				&& ((Integer) state.getAttribute(NEW_ASSIGNMENT_SUBMISSION_TYPE)).intValue()
+		if (contentReviewSiteAdvisor.siteCanUseReviewService(st) && !contentReviewSiteAdvisor.siteCanUseLTIReviewService(st) 
+				&& Boolean.TRUE.toString().equals(b) && ((Integer) state.getAttribute(NEW_ASSIGNMENT_SUBMISSION_TYPE)).intValue()
 					!= Assignment.SINGLE_ATTACHMENT_SUBMISSION)
 		{
 			addAlert(state, rb.getString("gen.cr.submit"));
