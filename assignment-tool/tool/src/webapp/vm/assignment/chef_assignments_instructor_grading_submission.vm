@@ -34,13 +34,13 @@ function handleEnterKeyPress(ev)
 		var reportsDiv = document.getElementById("reportsDiv");
 		if (reportsExpanded)
 		{
-			btn.src = "#imageLink('sakai/expand.gif')";
+			btn.src = "/library/image/sakai/expand.gif";
 			btn.alt = "$tlang.getString('review.report.expand')";
 			reportsDiv.style.display="none";
 		}
 		else
 		{
-			btn.src = "#imageLink('sakai/collapse.gif')";
+			btn.src = "/library/image/sakai/collapse.gif";
 			btn.alt = "$tlang.getString('review.report.collapse')";
 			reportsDiv.removeAttribute("style");
 			resizeFrame();
@@ -231,7 +231,7 @@ function handleEnterKeyPress(ev)
 								#set($reviewResults=$submission.ContentReviewResults)
                                 #if ($reviewResults.size() >= 3)
                                     <div class="discTria">
-                                        <input class="disclosureTriangle" type="image" onclick="handleReportsTriangleDisclosure(this); return false;" src="#imageLink("sakai/expand.gif")" alt="$tlang.getString('review.report.expand')"/>
+                                        <input class="disclosureTriangle" type="image" onclick="handleReportsTriangleDisclosure(this); return false;" src="/library/image/sakai/expand.gif" alt="$tlang.getString('review.report.expand')"/>
                                         ## TODO: reconsider for i18n:
                                         $reviewResults.size() $tlang.getString("review.reports")
                                     </div>
