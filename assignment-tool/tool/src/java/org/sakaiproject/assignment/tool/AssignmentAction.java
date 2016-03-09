@@ -185,6 +185,14 @@ public class AssignmentAction extends PagedResourceActionII
 	
 	private static final Boolean allowReviewService = ServerConfigurationService.getBoolean("assignment.useContentReview", false);
 	private static final Boolean allowPeerAssessment = ServerConfigurationService.getBoolean("assignment.usePeerAssessment", true);
+	private static Boolean allowLTIReviewService = false;
+	private static Boolean isDirectAccess = false;
+	private static final int contentreviewSiteYears = ServerConfigurationService.getInt("contentreview.site.years", 0);//TII value = 6
+	private static final int contentreviewSiteMin = ServerConfigurationService.getInt("contentreview.site.min", 0);//TII value = 2
+	private static final int contentreviewSiteMax = ServerConfigurationService.getInt("contentreview.site.max", 0);//TII value = 100
+	private static final int contentreviewAssignMin = ServerConfigurationService.getInt("contentreview.assign.min", 0);//TII value = 3
+	private static final int contentreviewAssignMax = ServerConfigurationService.getInt("contentreview.assign.max", 0);//TII value = 99
+	private static String reviewServiceName = "Review Service Default";
 	
 	/** Is the review service available? */
 	//Peer Assessment
@@ -552,6 +560,8 @@ public class AssignmentAction extends PagedResourceActionII
 	private static final String NEW_ASSIGNMENT_SHORT_TITLE = "new_assignment_short_title";
 	
 	private static final String NEW_ASSIGNMENT_LONG_TITLE = "new_assignment_long_title";
+	
+	private static final String NEW_ASSIGNMENT_INSTRUCTOR_FIELDS = "new_assignment_instructor_fields";
 
 	private static final String NEW_ASSIGNMENT_ADD_TO_GRADEBOOK = "new_assignment_add_to_gradebook";
 
@@ -928,7 +938,7 @@ public class AssignmentAction extends PagedResourceActionII
 
 		if (allowReviewService && contentReviewService != null && contentReviewService.isSiteAcceptable(s)) {
 			//put the review service strings in context
-			String reviewServiceName = contentReviewService.getServiceName();
+			reviewServiceName = contentReviewService.getServiceName();
 			String reviewServiceTitle = rb.getFormattedMessage("review.title", new Object[]{reviewServiceName});
 			String reviewServiceUse = rb.getFormattedMessage("review.use", new Object[]{reviewServiceName});
 			String reviewServiceNonElectronic1 = rb.getFormattedMessage("review.switch.ne.1", reviewServiceName);
@@ -942,6 +952,15 @@ public class AssignmentAction extends PagedResourceActionII
             context.put("reviewSwitchNe2", reviewServiceNonElectronic2);
 			if(contentReviewSiteAdvisor.siteCanUseLTIReviewService(s)){
 				context.put("allowLTIReviewService", true);
+				allowLTIReviewService = true;
+			} else {
+				context.put("allowLTIReviewService", false);
+				allowLTIReviewService = false;
+ 			}
+			if(contentReviewService.isDirectAccess(s)){
+				isDirectAccess = true;
+			} else {
+				isDirectAccess = false;
 			}
 		}
 		
@@ -1159,6 +1178,14 @@ public class AssignmentAction extends PagedResourceActionII
 		if (state.getAttribute(HAS_MULTIPLE_ASSIGNMENTS) != null)
 		{
 			context.put("assignmentscheck", state.getAttribute(HAS_MULTIPLE_ASSIGNMENTS));
+		}
+		
+		//SAK-30430 managing the content review error when creating assignment
+		if (state.getAttribute("alertMessageCR") != null){
+			String uiService = ServerConfigurationService.getString("ui.service", "Sakai");
+            String[] args = new String[]{contentReviewService.getServiceName(), uiService};
+			addAlert(state, rb.getFormattedMessage("content_review.error.createAssignment", args));
+			state.removeAttribute("alertMessageCR");
 		}
 		
 		return template;
@@ -1502,22 +1529,16 @@ public class AssignmentAction extends PagedResourceActionII
 			canViewAssignmentIntoContext(context, assignment, s);
 			
 			// add TII info if needed
-			Site st = null;
-			try {
-			    st = SiteService.getSite(contextString);
-				if (allowReviewService && assignment.getContent().getAllowReviewService() && contentReviewSiteAdvisor.siteCanUseLTIReviewService(st)){
-					//put the LTI assignment link in context
-					String ltiLink = contentReviewService.getLTIAccess(currentAssignmentReference, contextString);
-					M_log.debug("ltiLink " + ltiLink);
-					context.put("ltiLink", ltiLink);
-					if(contentReviewService.isDirectAccess(st) && canSubmit){
-						M_log.debug("Allowing submission directly from TII");
-						String templateAux = (String) getContext(data).get("template");
-						return templateAux + "_lti_access";
-					}
+			if (allowReviewService && assignment.getContent().getAllowReviewService() && allowLTIReviewService){
+				//put the LTI assignment link in context
+				String ltiLink = contentReviewService.getLTIAccess(currentAssignmentReference, contextString);
+				M_log.debug("ltiLink " + ltiLink);
+				context.put("ltiLink", ltiLink);
+				if(isDirectAccess && canSubmit){
+					M_log.debug("Allowing submission directly from TII");
+					String templateAux = (String) getContext(data).get("template");
+					return templateAux + "_lti_access";
 				}
-			} catch (IdUnusedException iue) {
-			    M_log.warn(this + ":buildStudentViewSubmissionContext: Site not found!" + iue.getMessage());
 			}
 		}
 
@@ -1808,20 +1829,14 @@ public class AssignmentAction extends PagedResourceActionII
 			
 			context.put("submissionType", submissionType);
 			
+			//warnings if user's fields are not set
 			if (allowReviewService && currentAssignment.getContent().getAllowReviewService()){
 				context.put("usingreview", true);
-				if(StringUtils.isEmpty(user.getFirstName())){
-					M_log.debug("Name is null");
-					context.put("namenull", true);
-				}
-				if(StringUtils.isEmpty(user.getLastName())){
-					M_log.debug("LastName is null");
-					context.put("lastnamenull", true);
-				}
-				if(StringUtils.isEmpty(user.getEmail())){
-					M_log.debug("Email is null");
-					context.put("mailnull", true);
-				}
+				context.put("namenull", Boolean.valueOf(StringUtils.isEmpty(user.getFirstName())));
+				context.put("lastname", Boolean.valueOf(StringUtils.isEmpty(user.getLastName())));
+				context.put("mailnull", Boolean.valueOf(StringUtils.isEmpty(user.getEmail())));
+			} else {
+				context.put("usingreview", false);
 			}
 			
 			AssignmentSubmission s = getSubmission(currentAssignmentReference, submitter, "build_student_view_submission_confirmation_context",state);
@@ -3700,21 +3715,15 @@ public class AssignmentAction extends PagedResourceActionII
 		
 		String template = (String) getContext(data).get("template");
 		
-		String contextString = (String) state.getAttribute(STATE_CONTEXT_STRING);		
-		Site st = null;
-		try {
-			st = SiteService.getSite(contextString);		
-			if (allowReviewService && assignment != null && assignment.getContent().getAllowReviewService() && contentReviewSiteAdvisor.siteCanUseLTIReviewService(st)){
-				String ltiLink = contentReviewService.getLTIAccess(assignmentRef, contextString);
-				M_log.debug("ltiLink " + ltiLink);
-				context.put("ltiLink", ltiLink);
-				if(contentReviewService.isDirectAccess(st)){
-					M_log.debug("Allowing submission directly from TII");
-					return template + "_lti_access";
-				}
+		String contextString = (String) state.getAttribute(STATE_CONTEXT_STRING);
+		if (allowReviewService && assignment != null && assignment.getContent().getAllowReviewService() && allowLTIReviewService){
+			String ltiLink = contentReviewService.getLTIAccess(assignmentRef, contextString);
+			M_log.debug("ltiLink " + ltiLink);
+			context.put("ltiLink", ltiLink);
+			if(isDirectAccess){
+				M_log.debug("Allowing submission directly from TII");
+				return template + "_lti_access";
 			}
-		} catch (IdUnusedException iue) {
-			M_log.warn(this + ":build_instructor_grade_assignment_context: Site not found!" + iue.getMessage());
 		}
 		
 		return template + TEMPLATE_INSTRUCTOR_GRADE_ASSIGNMENT;
@@ -3825,17 +3834,11 @@ public class AssignmentAction extends PagedResourceActionII
 		context.put("honor_pledge_text", ServerConfigurationService.getString("assignment.honor.pledge", rb.getString("gen.honple2")));
 		
 		String contextString = (String) state.getAttribute(STATE_CONTEXT_STRING);
-		Site st = null;
-		try {
-		    st = SiteService.getSite(contextString);
-			if (allowReviewService && assignment.getContent().getAllowReviewService() && contentReviewSiteAdvisor.siteCanUseLTIReviewService(st)){
-				//put the LTI assignment link in context
-				String ltiLink = contentReviewService.getLTIAccess(assignmentId, contextString);
-				M_log.debug("ltiLink " + ltiLink);
-				context.put("ltiLink", ltiLink);
-			}
-		} catch (IdUnusedException iue) {
-			M_log.warn(this + ":build_instructor_view_assignment_context: Site not found!" + iue.getMessage());
+		if (allowReviewService && assignment.getContent().getAllowReviewService() && allowLTIReviewService){
+			//put the LTI assignment link in context
+			String ltiLink = contentReviewService.getLTIAccess(assignmentId, contextString);
+			M_log.debug("ltiLink " + ltiLink);
+			context.put("ltiLink", ltiLink);
 		}
 		
 		String template = (String) getContext(data).get("template");
@@ -6579,36 +6582,47 @@ public class AssignmentAction extends PagedResourceActionII
 		else b = Boolean.TRUE.toString();
 		state.setAttribute(NEW_ASSIGNMENT_ALLOW_STUDENT_VIEW_EXTERNAL_GRADE, b);
 		
-		if (allowReviewService){
-			if (validify){
-				if (title != null && title.length() < 3){
-					// if the title is shorter than the minimum post the message
-					// One could ignore the message and still post the assignment
-					if (state.getAttribute(NEW_ASSIGNMENT_SHORT_TITLE) == null){
-						state.setAttribute(NEW_ASSIGNMENT_SHORT_TITLE, Boolean.TRUE.toString());
-					} else {
-						state.removeAttribute(NEW_ASSIGNMENT_SHORT_TITLE);
-					}
+		if (allowReviewService && allowLTIReviewService && validify){
+			if (title != null && contentreviewAssignMin > 0 && title.length() < contentreviewAssignMin){
+				// if the title is shorter than the minimum post the message
+				// One could ignore the message and still post the assignment
+				if (state.getAttribute(NEW_ASSIGNMENT_SHORT_TITLE) == null){
+					state.setAttribute(NEW_ASSIGNMENT_SHORT_TITLE, Boolean.TRUE.toString());
 				} else {
 					state.removeAttribute(NEW_ASSIGNMENT_SHORT_TITLE);
 				}
-				if (title != null && title.length() > 99){
-					// if the title is longer than the maximum post the message
-					// One could ignore the message and still post the assignment
-					if (state.getAttribute(NEW_ASSIGNMENT_LONG_TITLE) == null){
-						state.setAttribute(NEW_ASSIGNMENT_LONG_TITLE, Boolean.TRUE.toString());
-					} else {
-						state.removeAttribute(NEW_ASSIGNMENT_LONG_TITLE);
-					}
+			} else {
+				state.removeAttribute(NEW_ASSIGNMENT_SHORT_TITLE);
+			}
+			if (title != null && contentreviewAssignMax > 0 && title.length() > contentreviewAssignMax){
+				// if the title is longer than the maximum post the message
+				// One could ignore the message and still post the assignment
+				if (state.getAttribute(NEW_ASSIGNMENT_LONG_TITLE) == null){
+					state.setAttribute(NEW_ASSIGNMENT_LONG_TITLE, Boolean.TRUE.toString());
 				} else {
 					state.removeAttribute(NEW_ASSIGNMENT_LONG_TITLE);
 				}
+			} else {
+				state.removeAttribute(NEW_ASSIGNMENT_LONG_TITLE);
 			}
-			if (validify && state.getAttribute(NEW_ASSIGNMENT_SHORT_TITLE) != null){
-				addAlert(state, rb.getString("review.assignchars"));
+			User user = (User) state.getAttribute(STATE_USER);
+			if(StringUtils.isEmpty(user.getFirstName()) || StringUtils.isEmpty(user.getLastName()) || StringUtils.isEmpty(user.getEmail())){
+				if (state.getAttribute(NEW_ASSIGNMENT_INSTRUCTOR_FIELDS) == null){
+					state.setAttribute(NEW_ASSIGNMENT_INSTRUCTOR_FIELDS, Boolean.TRUE.toString());
+				} else {
+					state.removeAttribute(NEW_ASSIGNMENT_INSTRUCTOR_FIELDS);
+				}
+			} else {
+				state.removeAttribute(NEW_ASSIGNMENT_INSTRUCTOR_FIELDS);
 			}
-			if (validify && state.getAttribute(NEW_ASSIGNMENT_LONG_TITLE) != null){
-				addAlert(state, rb.getString("review.assigncharslong"));
+			if (state.getAttribute(NEW_ASSIGNMENT_SHORT_TITLE) != null){
+				addAlert(state, rb.getFormattedMessage("review.assignchars", new Object[]{contentreviewAssignMin, reviewServiceName}));
+			}
+			if (state.getAttribute(NEW_ASSIGNMENT_LONG_TITLE) != null){
+				addAlert(state, rb.getFormattedMessage("review.assigncharslong", new Object[]{contentreviewAssignMax, reviewServiceName}));
+			}
+			if (state.getAttribute(NEW_ASSIGNMENT_INSTRUCTOR_FIELDS) != null){
+				addAlert(state, rb.getFormattedMessage("review.instructor.fields", new Object[]{ reviewServiceName}));
 			}
 		}
 		
@@ -8831,7 +8845,9 @@ public class AssignmentAction extends PagedResourceActionII
             M_log.error(e);
             String technicalEmail = ServerConfigurationService.getString("mail.support", null);
             String alertMessage = rb.getFormattedMessage("content_review.error.createAssignment", new Object[]{technicalEmail});
-            state.setAttribute("alertMessage", alertMessage);
+            //state.setAttribute("alertMessage", alertMessage);
+			//SAK-30430
+			state.setAttribute("alertMessageCR", alertMessage);
         }
 		return false;
     }
@@ -9329,24 +9345,32 @@ public class AssignmentAction extends PagedResourceActionII
 				
 				state.setAttribute(STATE_MODE, MODE_INSTRUCTOR_NEW_EDIT_ASSIGNMENT);
 				
-				if(allowReviewService){
-					if (a.getTitle().length() < 3){//TODO length_assign as global property
-						addAlert(state, rb.getString("review.assignchars"));
-					} else if (a.getTitle().length() > 99){//TODO length_assign as global property
-						addAlert(state, rb.getString("review.assigncharslong"));
+				// generate alert when editing an assignment from old site
+				if(allowReviewService && allowLTIReviewService){
+					if (contentreviewAssignMin > 0 && a.getTitle().length() < contentreviewAssignMin){
+						addAlert(state, rb.getFormattedMessage("review.assignchars", new Object[]{contentreviewAssignMin, reviewServiceName}));
+					} else if (contentreviewAssignMax > 0 && a.getTitle().length() > contentreviewAssignMax){
+						addAlert(state, rb.getFormattedMessage("review.assigncharslong", new Object[]{contentreviewAssignMax, reviewServiceName}));
+					}
+					User user = (User) state.getAttribute(STATE_USER);
+					if(StringUtils.isEmpty(user.getFirstName()) || StringUtils.isEmpty(user.getLastName()) || StringUtils.isEmpty(user.getEmail())){
+						addAlert(state, rb.getFormattedMessage("review.instructor.fields", new Object[]{ reviewServiceName}));
 					}
 					Site st = null;
 					try {
 						st = SiteService.getSite((String) state.getAttribute(STATE_CONTEXT_STRING));
-						if (st.getTitle().length() < 2){//TODO length as global property
-							addAlert(state, rb.getString("review.sitechars"));
+						if (contentreviewSiteMin > 0 && st.getTitle().length() < contentreviewSiteMin){
+							addAlert(state, rb.getFormattedMessage("review.sitechars", new Object[]{contentreviewSiteMin, reviewServiceName}));
+						} else if (contentreviewSiteMax > 0 && st.getTitle().length() > contentreviewSiteMax){
+							addAlert(state, rb.getFormattedMessage("review.sitecharslong", new Object[]{contentreviewSiteMax, reviewServiceName}));
 						}
-						// generate alert when editing an assignment from old site
-						GregorianCalendar agoCalendar = new GregorianCalendar();
-						agoCalendar.add(GregorianCalendar.YEAR, -6);//TODO years as global property
-						Date agoDate = agoCalendar.getTime();
-						if (st.getCreatedDate().before(agoDate)){
-							addAlert(state, rb.getString("review.oldsite"));
+						if(contentreviewSiteYears > 0){
+							GregorianCalendar agoCalendar = new GregorianCalendar();
+							agoCalendar.add(GregorianCalendar.YEAR, -contentreviewSiteYears);
+							Date agoDate = agoCalendar.getTime();
+							if (st.getCreatedDate().before(agoDate)){
+								addAlert(state, rb.getFormattedMessage("review.oldsite", new Object[]{contentreviewSiteYears}));
+							}
 						}
 					} catch (IdUnusedException iue) {
 						M_log.warn(this + ":doEdit_Assignment: Site not found!" + iue.getMessage());
@@ -9622,18 +9646,12 @@ public class AssignmentAction extends PagedResourceActionII
 	 */
 	private void removeLTITool(SessionState state, AssignmentEdit aEdit){
 		String contextString = (String) state.getAttribute(STATE_CONTEXT_STRING);
-		Site st = null;
-		try {
-		    st = SiteService.getSite(contextString);
-			if (allowReviewService && aEdit.getContent().getAllowReviewService() && contentReviewSiteAdvisor.siteCanUseLTIReviewService(st)){
-				//put the LTI assignment link in context
-				boolean removed = contentReviewService.deleteLTITool(aEdit.getReference(), contextString);
-				if(!removed){
-					M_log.warn("Could not delete associated LTI tool");
-				}
+		if (allowReviewService && aEdit.getContent().getAllowReviewService() && allowLTIReviewService){
+			//put the LTI assignment link in context
+			boolean removed = contentReviewService.deleteLTITool(aEdit.getReference(), contextString);
+			if(!removed){
+				M_log.warn("Could not delete associated LTI tool");
 			}
-		} catch (IdUnusedException iue) {
-			M_log.warn(this + ":doDelete_assignment: Site not found!" + iue.getMessage());
 		}
 	}
 
@@ -11665,18 +11683,22 @@ public class AssignmentAction extends PagedResourceActionII
 		state.removeAttribute(ALLPURPOSE_ATTACHMENTS);
 
 		// generate alert when editing an assignment from old site
-		if(allowReviewService){
+		if(allowReviewService && allowLTIReviewService){
 			Site st = null;
 			try {
 				st = SiteService.getSite((String) state.getAttribute(STATE_CONTEXT_STRING));
-				if (st.getTitle().length()<2){//TODO length as global property
-					addAlert(state, rb.getString("review.sitechars"));
+				if (contentreviewSiteMin > 0 && st.getTitle().length() < contentreviewSiteMin){
+					addAlert(state, rb.getFormattedMessage("review.sitechars", new Object[]{contentreviewSiteMin, reviewServiceName}));
+				} else if (contentreviewSiteMax > 0 && st.getTitle().length() > contentreviewSiteMax){
+					addAlert(state, rb.getFormattedMessage("review.sitecharslong", new Object[]{contentreviewSiteMax, reviewServiceName}));
 				}
-				GregorianCalendar agoCalendar = new GregorianCalendar();
-				agoCalendar.add(GregorianCalendar.YEAR, -6);//TODO years as global property
-				Date agoDate = agoCalendar.getTime();
-				if (st.getCreatedDate().before(agoDate)){
-					addAlert(state, rb.getString("review.oldsite"));
+				if(contentreviewSiteYears > 0){
+					GregorianCalendar agoCalendar = new GregorianCalendar();
+					agoCalendar.add(GregorianCalendar.YEAR, -contentreviewSiteYears);
+					Date agoDate = agoCalendar.getTime();
+					if (st.getCreatedDate().before(agoDate)){
+						addAlert(state, rb.getFormattedMessage("review.oldsite", new Object[]{contentreviewSiteYears}));
+					}
 				}
 			} catch (IdUnusedException iue) {
 				M_log.warn(this + ":initializeAssignment: Site not found!" + iue.getMessage());
