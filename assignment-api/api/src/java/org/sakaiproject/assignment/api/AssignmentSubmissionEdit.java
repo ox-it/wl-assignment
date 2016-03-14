@@ -206,6 +206,18 @@ public interface AssignmentSubmissionEdit extends AssignmentSubmission, Edit
 	public void setReviewIconUrl(String url);
 	
 	/**
+	 * Set the color of the Review Report
+	 * @param url
+	 */
+	public void setReviewIconColor(String url);
+	
+	/**
+	 * When the external grade for this submission is different than the assignments one
+	 * @return
+	 */
+	public void setExternalGradeDifferent(boolean different);
+	
+	/**
 	 * Set the content review status
 	 * @param status
 	 */
@@ -265,4 +277,10 @@ public interface AssignmentSubmissionEdit extends AssignmentSubmission, Edit
 	 * @param attachments
 	 */
 	public void postAttachment(List attachments);
+	
+	/**
+	 * Post resubmission attachments to the content review service
+	 * @param attachments
+	 */
+	public void postAttachmentResub(List attachments);
 }

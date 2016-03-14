@@ -178,3 +178,16 @@ label.disabled {
     color: #aaa;
 }
 
+.reviewStyle{
+    color: red !important;
+    font-size: 15px !important;
+}
+
+.flagStyle{
+    font-size: 15px !important;
+}
+
+.errorStyle{
+    color: #f39c12 !important;
+    font-size: 15px !important;
+}

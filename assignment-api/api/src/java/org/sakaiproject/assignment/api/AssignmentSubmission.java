@@ -43,6 +43,9 @@ public interface AssignmentSubmission extends Entity
 	/** submission by different user */
 	public static final String SUBMITTER_USER_ID = "submitted_user_id";
 	
+	/** resource property that marks the attachment as being the inline submission (boolean) */
+    public static final String PROP_INLINE_SUBMISSION = "assignment_submission_attachment_is_inline";
+	
 	/**
 	 * Access the context at the time of creation.
 	 * 
@@ -132,6 +135,11 @@ public interface AssignmentSubmission extends Entity
 	 * @return List of the list of attachments as Reference objects;
 	 */
 	public List getSubmittedAttachments();
+	
+	/**
+     * Access the list of attachments to this response to the Assignment that do not have PROP_INLINE_SUBMISSION set
+     */
+    public List getVisibleSubmittedAttachments();
 
 	/**
 	 * Get the general comments by the grader
@@ -267,10 +275,27 @@ public interface AssignmentSubmission extends Entity
 	 * @return
 	 */
 	public String getReviewIconUrl();
+	
+	/**
+	 *  the color of the content review Icon associated with this submission
+	 * @return
+	 */
+	public String getReviewIconColor();
+	
+	/**
+	 *  indicates whether the external grade for this submission is different than the assignments one
+	 * @return
+	 */
+	public boolean isExternalGradeDifferent();
 
     /**
      *
      * @return error string, if any, returned from review service
      */
     public String getReviewError();
+	
+	/**
+     * Return a list of objects containing the ContentReviewResults --bbailla2
+     */
+    public List<ContentReviewResult> getContentReviewResults();
 }

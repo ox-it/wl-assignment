@@ -1,10 +1,31 @@
 <!-- $Id$ -->
 <!-- start: chef_assignments_student_view_grade.vm  -->
 ##<!-- $Header: /cvs/sakai2/legacy/tools/src/webapp/vm/assignment/chef_assignments_student_view_grade.vm,v 1.2 2005/05/19 19:39:49 gsilver.umich.edu Exp $ -->
+<link href="/library/font-awesome/font-awesome-4.4.0/css/font-awesome.min.css" type="text/css" rel="stylesheet" media="all">
 <script type="text/javascript">
     $(document).ready(function(){
         setupToggleAreas('toggleAnchor', 'toggledContent', false, 'fast');
     });
+	
+	var reportsExpanded = false;
+	function handleReportsTriangleDisclosure(btn)
+	{
+		var reportsDiv = document.getElementById("reportsDiv");
+		if (reportsExpanded)
+		{
+			btn.src="/library/image/sakai/expand.gif";
+			btn.alt="$tlang.getString('review.report.expand')";
+			reportsDiv.style.display="none";
+		}
+		else
+		{
+			btn.src="/library/image/sakai/collapse.gif";
+			btn.alt="$tlang.getString('review.report.collapse')";
+			reportsDiv.style.display="block";
+			resizeFrame();
+		}
+		reportsExpanded = !reportsExpanded;
+	}
 </script>
 <div class="portletBody">
 	#set ($assignment = $submission.Assignment)
@@ -141,12 +162,44 @@
 							<td>
 							#if (!$submission)
 								$tlang.getString("review.notavail")
-							#elseif ($submission.getReviewReport().equals("Error"))
-								<div class="alertMessage" >$!submission.getReviewError()</div>
 							#else
-								<img src="$submission.getReviewIconUrl()" alt="$submission.getReviewScore()">
-							
-								<a href="$submission.getReviewReport()" target="_blank">$tlang.getString("review.viewreport")</a>
+								#set($reviewResults=$submission.ContentReviewResults)
+                                #if ($reviewResults.size() >= 3)
+                                    <div class="discTria">
+                                        <input class="disclosureTriangle" type="image" onclick="handleReportsTriangleDisclosure(this); return false;" src="/library/image/sakai/expand.gif" alt="$tlang.getString('review.report.expand')"/>
+                                        ## TODO: reconsider for i18n
+                                        $reviewResults.size() $tlang.getString("review.reports")
+                                    </div>
+                                    <div id="reportsDiv" style="display:none;">
+                                #end
+                                #foreach ($reviewResult in $reviewResults)
+                                    <div>
+                                        #set ($props = $reviewResult.getContentResource().Properties)
+                                        <span class="reportIcon">
+                                        
+                                        #if ($reviewResult.getReviewReport().equals("Error"))
+                                            <i alt="$reviewResult.getReviewError()" title="$reviewResult.getReviewError()" class="fa fa-exclamation-triangle errorStyle"></i>
+                                        #else
+                                            <a href="$reviewResult.getReviewReport()" target="_blank">
+												<i alt="$tlang.getString("review.originality.alt") = $reviewResult.getReviewScore() %" title="$tlang.getString("review.originality.alt") = $reviewResult.getReviewScore() %" class="fa fa-flag flagStyle" style="color:$reviewResult.getReviewIconColor() !important"></i>
+                                            </a>
+                                        #end
+                                        </span>
+                                        #if ($reviewResult.isInline())
+                                            $tlang.getString("submission.inline")
+                                        #else
+                                            $validator.escapeHtml($props.getPropertyFormatted($props.NamePropDisplayName))
+                                        #end
+										#if($reviewResult.getExternalGrade() && $assignment.getContent().AllowStudentViewExternalGrade)
+											<span style="font-style:italic !important">
+												( $tlang.getString("gen.gra.ext") $reviewResult.getExternalGrade() )
+											</span>
+										#end
+                                    </div>
+                                #end
+                                #if ($reviewResults.size() >= 3)
+                                    </div>
+                                #end
 							#end
 							</td>
 				
@@ -330,7 +383,7 @@
 					<div class="textPanel">$submission.getSubmittedText()</div>
 				#end
 			#end
-			#set ($submittedAttachments = $submission.SubmittedAttachments)
+			#set ($submittedAttachments = $submission.VisibleSubmittedAttachments)
 			#set ($size = 0)
 			#set ($props = false)
 			#foreach ($attachment in $submittedAttachments) 

@@ -146,6 +146,14 @@ public interface AssignmentContentEdit extends AssignmentContent, AttachmentCont
 	public void setAllowStudentViewReport(boolean allow);
 	
 	/**
+	 * Set whether this sssignment allow students to view review service grades?
+	 * 
+	 * @param allow -
+	 *        true if the Assignment allows students to view review service grade, false otherwise
+	 */
+	public void setAllowStudentViewExternalGrade(boolean allow);
+	
+	/**
 	 * Add an author to the author list.
 	 * 
 	 * @param author -
