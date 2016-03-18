@@ -539,16 +539,24 @@ function handleEnterKeyPress(ev)
 									</p>	
 								#elseif ($gradeType == 3)
 									<p class="shorttext">
-										##TODO check other grade types
-										#if($allowReviewService && $assignment.getContent().AllowReviewService && $submission.isExternalGradeDifferent())
-											<i alt="$tlang.getString('gen.gra.diff')" title="$tlang.getString('gen.gra.diff')" class="fa fa-exclamation reviewStyle" ></i>
-										#end
 										<label for="grade">$tlang.getString("gen.gra2")
 										#if($assignment.getAllowPeerAssessment())
 											&nbsp<img id="infoImg" title="$tlang.getString('peerassessment.peerGradeInfo')" src="/library/image/silk/information.png" onclick="$('#peerReviewInfo').show();"/>
 										#end
 										</label>
 										<input type="text" name="$name_grade" size="5" maxlength="11" value="$!value_grade" id="grade" onkeypress="return handleEnterKeyPress(event);" /> <span class="instruction">($tlang.getString("grade.max") $assignment.getContent().getMaxGradePointDisplay())</span>
+										#if($allowReviewService && $assignment.getContent().AllowReviewService && $submission.isExternalGradeDifferent())
+											#set($reviewResultsExt=$submission.ContentReviewResults)
+											#if ($reviewResultsExt.size() == 1)
+												#foreach ($reviewResultExt in $reviewResultsExt)
+													#if ($reviewResultExt.getExternalGrade())
+														<span style="font-style:italic !important" class="instruction">
+															($tlang.getString("gen.gra.ext") $reviewResultExt.getExternalGrade())
+														</span>
+													#end
+												#end
+											#end
+										#end
 									</p>	
 									<div id="peerReviewInfo" class="popupMessage" style="display:none">$tlang.getString("peerassessment.peerGradeInfo")</div>
 								#elseif ($gradeType == 4)

@@ -191,3 +191,9 @@ label.disabled {
     color: #f39c12 !important;
     font-size: 15px !important;
 }
+
+.conflicting-assignment-mark{
+    color: red !important;
+    font-style: italic !important;
+    cursor: pointer !important;
+}
