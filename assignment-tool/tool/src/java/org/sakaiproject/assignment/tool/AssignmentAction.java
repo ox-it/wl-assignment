@@ -6054,9 +6054,15 @@ public class AssignmentAction extends PagedResourceActionII
 		else b = Boolean.TRUE.toString();
 		state.setAttribute(NEW_ASSIGNMENT_USE_REVIEW_SERVICE, b);
 		
-		if (Boolean.TRUE.toString().equals(b)
-				&& ((Integer) state.getAttribute(NEW_ASSIGNMENT_SUBMISSION_TYPE)).intValue()
-					!= Assignment.SINGLE_ATTACHMENT_SUBMISSION)
+		Site st = null;
+		try {
+		    st = SiteService.getSite((String) state.getAttribute(STATE_CONTEXT_STRING));
+		} catch (IdUnusedException iue) {
+		    M_log.warn(this + ":setNewAssignmentParameters: Site not found!" + iue.getMessage());
+		}
+		if (Boolean.TRUE.toString().equals(b) && contentReviewSiteAdvisor.siteCanUseReviewService(st)
+					&& (((Integer) state.getAttribute(NEW_ASSIGNMENT_SUBMISSION_TYPE)).intValue() != Assignment.SINGLE_ATTACHMENT_SUBMISSION || 
+						((Integer) state.getAttribute(NEW_ASSIGNMENT_SUBMISSION_TYPE)).intValue() != Assignment.TEXT_ONLY_ASSIGNMENT_SUBMISSION ))
 		{
 			addAlert(state, rb.getString("gen.cr.submit"));
 		}
