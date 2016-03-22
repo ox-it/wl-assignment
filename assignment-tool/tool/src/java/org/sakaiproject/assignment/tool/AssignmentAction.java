@@ -6515,15 +6515,7 @@ public class AssignmentAction extends PagedResourceActionII
 		
 		r = params.getString(NEW_ASSIGNMENT_PEER_ASSESSMENT_ANON_EVAL);
 		if (r == null) b = Boolean.FALSE.toString();
-		else 
-        {
-            b = Boolean.TRUE.toString();
-            if (state.getAttribute(NEW_ASSIGNMENT_SUBMISSION_TYPE).equals(Assignment.NON_ELECTRONIC_ASSIGNMENT_SUBMISSION))
-            {
-                //can't use content-review with non-electronic submissions
-                addAlert(state, rb.getFormattedMessage("review.switch.ne.1", contentReviewService.getServiceName()));
-            }
-        }
+		else b = Boolean.TRUE.toString();
 		state.setAttribute(NEW_ASSIGNMENT_PEER_ASSESSMENT_ANON_EVAL, b);
 		
 		r = params.getString(NEW_ASSIGNMENT_PEER_ASSESSMENT_STUDENT_VIEW_REVIEWS);
@@ -6554,22 +6546,85 @@ public class AssignmentAction extends PagedResourceActionII
 		r = params.getString(NEW_ASSIGNMENT_USE_REVIEW_SERVICE);
 		// set whether we use the review service or not
 		if (r == null) b = Boolean.FALSE.toString();
-		else b = Boolean.TRUE.toString();
+		else {
+			b = Boolean.TRUE.toString();
+			if (state.getAttribute(NEW_ASSIGNMENT_SUBMISSION_TYPE).equals(Assignment.NON_ELECTRONIC_ASSIGNMENT_SUBMISSION))
+			{
+				//can't use content-review with non-electronic submissions
+				addAlert(state, rb.getFormattedMessage("review.switch.ne.1", contentReviewService.getServiceName()));
+			}
+			Site st = null;
+			try {
+				st = SiteService.getSite((String) state.getAttribute(STATE_CONTEXT_STRING));
+			} catch (IdUnusedException iue) {
+				M_log.warn(this + ":setNewAssignmentParameters: Site not found!" + iue.getMessage());
+			}
+			if (contentReviewSiteAdvisor.siteCanUseReviewService(st) && !contentReviewSiteAdvisor.siteCanUseLTIReviewService(st)
+					&& Boolean.TRUE.toString().equals(b) && ((Integer) state.getAttribute(NEW_ASSIGNMENT_SUBMISSION_TYPE)).intValue()
+						!= Assignment.SINGLE_ATTACHMENT_SUBMISSION)
+			{
+				addAlert(state, rb.getString("gen.cr.submit"));
+			}
+
+			if (allowReviewService && allowLTIReviewService && validify){
+				if (title != null && contentreviewAssignMin > 0 && title.length() < contentreviewAssignMin){
+					// if the title is shorter than the minimum post the message
+					// One could ignore the message and still post the assignment
+					if (state.getAttribute(NEW_ASSIGNMENT_SHORT_TITLE) == null){
+						state.setAttribute(NEW_ASSIGNMENT_SHORT_TITLE, Boolean.TRUE.toString());
+					} else {
+						state.removeAttribute(NEW_ASSIGNMENT_SHORT_TITLE);
+					}
+				} else {
+					state.removeAttribute(NEW_ASSIGNMENT_SHORT_TITLE);
+				}
+				if (title != null && contentreviewAssignMax > 0 && title.length() > contentreviewAssignMax){
+					// if the title is longer than the maximum post the message
+					// One could ignore the message and still post the assignment
+					if (state.getAttribute(NEW_ASSIGNMENT_LONG_TITLE) == null){
+						state.setAttribute(NEW_ASSIGNMENT_LONG_TITLE, Boolean.TRUE.toString());
+					} else {
+						state.removeAttribute(NEW_ASSIGNMENT_LONG_TITLE);
+					}
+				} else {
+					state.removeAttribute(NEW_ASSIGNMENT_LONG_TITLE);
+				}
+				User user = (User) state.getAttribute(STATE_USER);
+				if(StringUtils.isEmpty(user.getFirstName()) || StringUtils.isEmpty(user.getLastName()) || StringUtils.isEmpty(user.getEmail())){
+					if (state.getAttribute(NEW_ASSIGNMENT_INSTRUCTOR_FIELDS) == null){
+						state.setAttribute(NEW_ASSIGNMENT_INSTRUCTOR_FIELDS, Boolean.TRUE.toString());
+					} else {
+						state.removeAttribute(NEW_ASSIGNMENT_INSTRUCTOR_FIELDS);
+					}
+				} else {
+					state.removeAttribute(NEW_ASSIGNMENT_INSTRUCTOR_FIELDS);
+				}
+				if (state.getAttribute(NEW_ASSIGNMENT_SHORT_TITLE) != null){
+					addAlert(state, rb.getFormattedMessage("review.assignchars", new Object[]{reviewServiceName, contentreviewAssignMin}));
+				}
+				if (state.getAttribute(NEW_ASSIGNMENT_LONG_TITLE) != null){
+					addAlert(state, rb.getFormattedMessage("review.assigncharslong", new Object[]{reviewServiceName, contentreviewAssignMax}));
+				}
+				if (state.getAttribute(NEW_ASSIGNMENT_INSTRUCTOR_FIELDS) != null){
+					addAlert(state, rb.getFormattedMessage("review.instructor.fields", new Object[]{ reviewServiceName}));
+				}
+				if (contentreviewSiteMin > 0 && st.getTitle().length() < contentreviewSiteMin){
+					addAlert(state, rb.getFormattedMessage("review.sitechars", new Object[]{reviewServiceName, contentreviewSiteMin}));
+				} else if (contentreviewSiteMax > 0 && st.getTitle().length() > contentreviewSiteMax){
+					addAlert(state, rb.getFormattedMessage("review.sitecharslong", new Object[]{reviewServiceName, contentreviewSiteMax}));
+				}
+				if(contentreviewSiteYears > 0){
+					GregorianCalendar agoCalendar = new GregorianCalendar();
+					agoCalendar.add(GregorianCalendar.YEAR, -contentreviewSiteYears);
+					Date agoDate = agoCalendar.getTime();
+					if (st.getCreatedDate().before(agoDate)){
+						addAlert(state, rb.getFormattedMessage("review.oldsite", new Object[]{contentreviewSiteYears}));
+					}
+				}
+			}
+		}
 		state.setAttribute(NEW_ASSIGNMENT_USE_REVIEW_SERVICE, b);
 		
-		Site st = null;
-		try {
-		    st = SiteService.getSite((String) state.getAttribute(STATE_CONTEXT_STRING));
-		} catch (IdUnusedException iue) {
-		    M_log.warn(this + ":setNewAssignmentParameters: Site not found!" + iue.getMessage());
-		}
-		if (contentReviewSiteAdvisor.siteCanUseReviewService(st) && !contentReviewSiteAdvisor.siteCanUseLTIReviewService(st) 
-				&& Boolean.TRUE.toString().equals(b) && ((Integer) state.getAttribute(NEW_ASSIGNMENT_SUBMISSION_TYPE)).intValue()
-					!= Assignment.SINGLE_ATTACHMENT_SUBMISSION)
-		{
-			addAlert(state, rb.getString("gen.cr.submit"));
-		}
-
 		//set whether students can view the review service results
 		r = params.getString(NEW_ASSIGNMENT_ALLOW_STUDENT_VIEW);
 		if (r == null) b = Boolean.FALSE.toString();
@@ -6581,50 +6636,6 @@ public class AssignmentAction extends PagedResourceActionII
 		if (r == null) b = Boolean.FALSE.toString();
 		else b = Boolean.TRUE.toString();
 		state.setAttribute(NEW_ASSIGNMENT_ALLOW_STUDENT_VIEW_EXTERNAL_GRADE, b);
-		
-		if (allowReviewService && allowLTIReviewService && validify){
-			if (title != null && contentreviewAssignMin > 0 && title.length() < contentreviewAssignMin){
-				// if the title is shorter than the minimum post the message
-				// One could ignore the message and still post the assignment
-				if (state.getAttribute(NEW_ASSIGNMENT_SHORT_TITLE) == null){
-					state.setAttribute(NEW_ASSIGNMENT_SHORT_TITLE, Boolean.TRUE.toString());
-				} else {
-					state.removeAttribute(NEW_ASSIGNMENT_SHORT_TITLE);
-				}
-			} else {
-				state.removeAttribute(NEW_ASSIGNMENT_SHORT_TITLE);
-			}
-			if (title != null && contentreviewAssignMax > 0 && title.length() > contentreviewAssignMax){
-				// if the title is longer than the maximum post the message
-				// One could ignore the message and still post the assignment
-				if (state.getAttribute(NEW_ASSIGNMENT_LONG_TITLE) == null){
-					state.setAttribute(NEW_ASSIGNMENT_LONG_TITLE, Boolean.TRUE.toString());
-				} else {
-					state.removeAttribute(NEW_ASSIGNMENT_LONG_TITLE);
-				}
-			} else {
-				state.removeAttribute(NEW_ASSIGNMENT_LONG_TITLE);
-			}
-			User user = (User) state.getAttribute(STATE_USER);
-			if(StringUtils.isEmpty(user.getFirstName()) || StringUtils.isEmpty(user.getLastName()) || StringUtils.isEmpty(user.getEmail())){
-				if (state.getAttribute(NEW_ASSIGNMENT_INSTRUCTOR_FIELDS) == null){
-					state.setAttribute(NEW_ASSIGNMENT_INSTRUCTOR_FIELDS, Boolean.TRUE.toString());
-				} else {
-					state.removeAttribute(NEW_ASSIGNMENT_INSTRUCTOR_FIELDS);
-				}
-			} else {
-				state.removeAttribute(NEW_ASSIGNMENT_INSTRUCTOR_FIELDS);
-			}
-			if (state.getAttribute(NEW_ASSIGNMENT_SHORT_TITLE) != null){
-				addAlert(state, rb.getFormattedMessage("review.assignchars", new Object[]{contentreviewAssignMin, reviewServiceName}));
-			}
-			if (state.getAttribute(NEW_ASSIGNMENT_LONG_TITLE) != null){
-				addAlert(state, rb.getFormattedMessage("review.assigncharslong", new Object[]{contentreviewAssignMax, reviewServiceName}));
-			}
-			if (state.getAttribute(NEW_ASSIGNMENT_INSTRUCTOR_FIELDS) != null){
-				addAlert(state, rb.getFormattedMessage("review.instructor.fields", new Object[]{ reviewServiceName}));
-			}
-		}
 		
 		//set submit options
 		r = params.getString(NEW_ASSIGNMENT_REVIEW_SERVICE_SUBMIT_RADIO);
@@ -9346,11 +9357,11 @@ public class AssignmentAction extends PagedResourceActionII
 				state.setAttribute(STATE_MODE, MODE_INSTRUCTOR_NEW_EDIT_ASSIGNMENT);
 				
 				// generate alert when editing an assignment from old site
-				if(allowReviewService && allowLTIReviewService){
+				if(allowReviewService && allowLTIReviewService && a.getContent().getAllowReviewService()){
 					if (contentreviewAssignMin > 0 && a.getTitle().length() < contentreviewAssignMin){
-						addAlert(state, rb.getFormattedMessage("review.assignchars", new Object[]{contentreviewAssignMin, reviewServiceName}));
+						addAlert(state, rb.getFormattedMessage("review.assignchars", new Object[]{reviewServiceName, contentreviewAssignMin}));
 					} else if (contentreviewAssignMax > 0 && a.getTitle().length() > contentreviewAssignMax){
-						addAlert(state, rb.getFormattedMessage("review.assigncharslong", new Object[]{contentreviewAssignMax, reviewServiceName}));
+						addAlert(state, rb.getFormattedMessage("review.assigncharslong", new Object[]{reviewServiceName, contentreviewAssignMax}));
 					}
 					User user = (User) state.getAttribute(STATE_USER);
 					if(StringUtils.isEmpty(user.getFirstName()) || StringUtils.isEmpty(user.getLastName()) || StringUtils.isEmpty(user.getEmail())){
@@ -9360,9 +9371,9 @@ public class AssignmentAction extends PagedResourceActionII
 					try {
 						st = SiteService.getSite((String) state.getAttribute(STATE_CONTEXT_STRING));
 						if (contentreviewSiteMin > 0 && st.getTitle().length() < contentreviewSiteMin){
-							addAlert(state, rb.getFormattedMessage("review.sitechars", new Object[]{contentreviewSiteMin, reviewServiceName}));
+							addAlert(state, rb.getFormattedMessage("review.sitechars", new Object[]{reviewServiceName, contentreviewSiteMin}));
 						} else if (contentreviewSiteMax > 0 && st.getTitle().length() > contentreviewSiteMax){
-							addAlert(state, rb.getFormattedMessage("review.sitecharslong", new Object[]{contentreviewSiteMax, reviewServiceName}));
+							addAlert(state, rb.getFormattedMessage("review.sitecharslong", new Object[]{reviewServiceName, contentreviewSiteMax}));
 						}
 						if(contentreviewSiteYears > 0){
 							GregorianCalendar agoCalendar = new GregorianCalendar();
@@ -11683,29 +11694,6 @@ public class AssignmentAction extends PagedResourceActionII
 		state.removeAttribute(ALLPURPOSE_RETRACT_DATE);
 		state.removeAttribute(ALLPURPOSE_ACCESS);
 		state.removeAttribute(ALLPURPOSE_ATTACHMENTS);
-
-		// generate alert when editing an assignment from old site
-		if(allowReviewService && allowLTIReviewService){
-			Site st = null;
-			try {
-				st = SiteService.getSite((String) state.getAttribute(STATE_CONTEXT_STRING));
-				if (contentreviewSiteMin > 0 && st.getTitle().length() < contentreviewSiteMin){
-					addAlert(state, rb.getFormattedMessage("review.sitechars", new Object[]{contentreviewSiteMin, reviewServiceName}));
-				} else if (contentreviewSiteMax > 0 && st.getTitle().length() > contentreviewSiteMax){
-					addAlert(state, rb.getFormattedMessage("review.sitecharslong", new Object[]{contentreviewSiteMax, reviewServiceName}));
-				}
-				if(contentreviewSiteYears > 0){
-					GregorianCalendar agoCalendar = new GregorianCalendar();
-					agoCalendar.add(GregorianCalendar.YEAR, -contentreviewSiteYears);
-					Date agoDate = agoCalendar.getTime();
-					if (st.getCreatedDate().before(agoDate)){
-						addAlert(state, rb.getFormattedMessage("review.oldsite", new Object[]{contentreviewSiteYears}));
-					}
-				}
-			} catch (IdUnusedException iue) {
-				M_log.warn(this + ":initializeAssignment: Site not found!" + iue.getMessage());
-			}
-		}
 		
 	} // initializeAssignment
 	
