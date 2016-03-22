@@ -1534,6 +1534,12 @@ public class AssignmentAction extends PagedResourceActionII
 				String ltiLink = contentReviewService.getLTIAccess(currentAssignmentReference, contextString);
 				M_log.debug("ltiLink " + ltiLink);
 				context.put("ltiLink", ltiLink);
+				/* TODO on trunk more than one decimal is possible
+				int factor = AssignmentService.getScaleFactor();
+				int dec = (int)Math.log10(factor);
+				int maxPoints = assignmentContent.getMaxGradePoint() / dec;*/
+				int maxPointsInt = assignment.getContent().getMaxGradePoint() / 10;
+				context.put("maxPointsInt", maxPointsInt);
 				if(isDirectAccess && canSubmit){
 					M_log.debug("Allowing submission directly from TII");
 					String templateAux = (String) getContext(data).get("template");
@@ -2143,6 +2149,17 @@ public class AssignmentAction extends PagedResourceActionII
 		
 		if (asgnAdvisor != null) {
 			m_securityService.popAdvisor(asgnAdvisor);
+		}
+
+		// add TII info if needed
+		String contextString = (String) state.getAttribute(STATE_CONTEXT_STRING);
+		if (allowReviewService && assignment.getContent().getAllowReviewService() && allowLTIReviewService){
+			/* TODO on trunk more than one decimal is possible
+			int factor = AssignmentService.getScaleFactor();
+			int dec = (int)Math.log10(factor);
+			int maxPoints = assignmentContent.getMaxGradePoint() / dec;*/
+			int maxPointsInt = assignment.getContent().getMaxGradePoint() / 10;
+			context.put("maxPointsInt", maxPointsInt);
 		}
 		
 		String template = (String) getContext(data).get("template");
@@ -3241,6 +3258,17 @@ public class AssignmentAction extends PagedResourceActionII
 		
 		// letter grading
 		letterGradeOptionsIntoContext(context);
+
+		// add TII info if needed
+		String contextString = (String) state.getAttribute(STATE_CONTEXT_STRING);
+		if (allowReviewService && a.getContent().getAllowReviewService() && allowLTIReviewService){
+			/* TODO on trunk more than one decimal is possible
+			int factor = AssignmentService.getScaleFactor();
+			int dec = (int)Math.log10(factor);
+			int maxPoints = assignmentContent.getMaxGradePoint() / dec;*/
+			int maxPointsInt = a.getContent().getMaxGradePoint() / 10;
+			context.put("maxPointsInt", maxPointsInt);
+		}
 		
 		String template = (String) getContext(data).get("template");
 		return template + TEMPLATE_INSTRUCTOR_GRADE_SUBMISSION;
@@ -3720,6 +3748,12 @@ public class AssignmentAction extends PagedResourceActionII
 			String ltiLink = contentReviewService.getLTIAccess(assignmentRef, contextString);
 			M_log.debug("ltiLink " + ltiLink);
 			context.put("ltiLink", ltiLink);
+			/* TODO on trunk more than one decimal is possible
+			int factor = AssignmentService.getScaleFactor();
+			int dec = (int)Math.log10(factor);
+			int maxPoints = assignmentContent.getMaxGradePoint() / dec;*/
+			int maxPointsInt = assignment.getContent().getMaxGradePoint() / 10;
+			context.put("maxPointsInt", maxPointsInt);
 			if(isDirectAccess){
 				M_log.debug("Allowing submission directly from TII");
 				return template + "_lti_access";
