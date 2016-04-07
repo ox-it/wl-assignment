@@ -192,7 +192,7 @@
                                         #end
 										#if($reviewResult.getExternalGrade() && $assignment.getContent().AllowStudentViewExternalGrade)
 											<span style="font-style:italic !important">
-												( $tlang.getString("gen.gra.ext") $reviewResult.getExternalGrade() )
+												($tlang.getString("gen.gra.ext") $reviewResult.getExternalGrade() / $maxPointsInt)
 											</span>
 										#end
                                     </div>
