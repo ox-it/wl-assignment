@@ -761,9 +761,10 @@
 							#if ($withGrade)
 								<td headers="grade">
 									#if($!submission)
-										$submission.getGradeDisplay()
 										#if($allowReviewService && $assignment.getContent().AllowReviewService && $submission.isExternalGradeDifferent())
-											<i alt="$tlang.getString('gen.gra.diff')" title="$tlang.getString('gen.gra.diff')" class="fa fa-exclamation reviewStyle" ></i>
+											<span onclick="alert('$tlang.getFormattedMessage('review.conflicting.popup', $reviewServiceName)')" class="conflicting-assignment-mark">$submission.getGradeDisplay($typeOfGrade)!</span>
+										#else
+											$submission.getGradeDisplay($typeOfGrade)										
 										#end
 									#end
 								</td>
