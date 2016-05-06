@@ -29,6 +29,14 @@
 $(document).ready(function() {
  	setupAssignNew();
  	#if($turnitin_forceSingleAttachment)
+	 	var useReview = document.getElementById('$name_UseReviewService');
+	 	if(useReview.checked){
+			$("#subType > option").each(function(){
+				if($(this).val() != 5 && $(this).val() != 1){
+					$(this).prop('disabled', 'disabled');
+				}
+			});
+	 	}
 	 	$("#new_assignment_use_review_service").click(function (){
 	 		var checked = this.checked;
 	 		if(checked){
@@ -36,7 +44,7 @@ $(document).ready(function() {
 	 		}
 	 		$("#subType > option").each(function(){
 	 			if(checked){
-	 				if($(this).val() != 5){
+	 				if($(this).val() != 5 && $(this).val() != 1){
 	 					$(this).prop('disabled', 'disabled');
 	 				}
 	 			}else{

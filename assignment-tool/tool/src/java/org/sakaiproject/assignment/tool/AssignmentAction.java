@@ -6596,6 +6596,9 @@ public class AssignmentAction extends PagedResourceActionII
 			if (contentReviewSiteAdvisor.siteCanUseReviewService(st) && !contentReviewSiteAdvisor.siteCanUseLTIReviewService(st)
 					&& Boolean.TRUE.toString().equals(b) && ((Integer) state.getAttribute(NEW_ASSIGNMENT_SUBMISSION_TYPE)).intValue()
 						!= Assignment.SINGLE_ATTACHMENT_SUBMISSION)
+			if (Boolean.TRUE.toString().equals(b) && contentReviewSiteAdvisor.siteCanUseReviewService(st)
+ 					&& (((Integer) state.getAttribute(NEW_ASSIGNMENT_SUBMISSION_TYPE)).intValue() != Assignment.SINGLE_ATTACHMENT_SUBMISSION || 
+ 						((Integer) state.getAttribute(NEW_ASSIGNMENT_SUBMISSION_TYPE)).intValue() != Assignment.TEXT_ONLY_ASSIGNMENT_SUBMISSION ))
 			{
 				addAlert(state, rb.getString("gen.cr.submit"));
 			}
