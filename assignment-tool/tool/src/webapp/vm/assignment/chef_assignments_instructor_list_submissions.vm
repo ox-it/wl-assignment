@@ -432,6 +432,9 @@
                  	</a>
 				</p>
 				<div id="allowResubmission_shownInner" style="display:none">
+				#if ($allowReviewService && $assignment.getContent().AllowReviewService)
+					<div class="alertMessage">$tlang.getFormattedMessage("allowResubmission.review.warning", $reviewServiceName)</div>
+				#end
 				 <p class="instruction">
                 #if ($assignment.isGroup())
                     $tlang.getString("allowResubmission.groups.instruction")
