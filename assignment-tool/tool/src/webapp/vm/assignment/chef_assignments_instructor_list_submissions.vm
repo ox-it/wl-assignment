@@ -767,7 +767,7 @@
 										#if($allowReviewService && $assignment.getContent().AllowReviewService && $submission.isExternalGradeDifferent())
 											<span onclick="alert('$tlang.getFormattedMessage('review.conflicting.popup', $reviewServiceName)')" class="conflicting-assignment-mark">$submission.getGradeDisplay($typeOfGrade)!</span>
 										#else
-											$submission.getGradeDisplay($typeOfGrade)										
+											$submission.getGradeDisplay()
 										#end
 									#end
 								</td>
