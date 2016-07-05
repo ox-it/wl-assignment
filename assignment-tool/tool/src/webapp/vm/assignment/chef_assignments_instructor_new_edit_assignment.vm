@@ -32,8 +32,14 @@ $(document).ready(function() {
 	 	var useReview = document.getElementById('$name_UseReviewService');
 	 	if(useReview.checked){
 			$("#subType > option").each(function(){
-				if($(this).val() != 5 && $(this).val() != 1){
-					$(this).prop('disabled', 'disabled');
+				if ($allowReviewService && $allowLTIReviewService){
+					if($(this).val() != 5 && $(this).val() != 1){
+						$(this).prop('disabled', 'disabled');
+					}
+				} else if ($allowReviewService) {
+					if($(this).val() != 5){
+						$(this).prop('disabled', 'disabled');
+					}
 				}
 			});
 	 	}
@@ -44,9 +50,15 @@ $(document).ready(function() {
 	 		}
 	 		$("#subType > option").each(function(){
 	 			if(checked){
-	 				if($(this).val() != 5 && $(this).val() != 1){
-	 					$(this).prop('disabled', 'disabled');
-	 				}
+	 				if ($allowReviewService && $allowLTIReviewService){
+						if($(this).val() != 5 && $(this).val() != 1){
+							$(this).prop('disabled', 'disabled');
+						}
+					} else if ($allowReviewService) {
+						if($(this).val() != 5){
+							$(this).prop('disabled', 'disabled');
+						}
+					}
 	 			}else{
 	 				$(this).removeProp('disabled');
 	 			
